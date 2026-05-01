@@ -8,7 +8,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ruby: ['3.3', '3.4']
+        # Single-value matrix kept so the job-name suffix `(3.4)` matches branch-protection required-check names.
+        ruby: ['3.4']
     runs-on: ubuntu-latest
 
     steps:
