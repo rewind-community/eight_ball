@@ -1,5 +1,9 @@
 # Changelog
 
+## [3.2.0]
+
+- Upgrade Ruby to 3.4.5
+
 ## [3.1.1]
 
 - Loosen `required_ruby_version` to `>= 3.2` for Edge compatibility (EC-4270)
