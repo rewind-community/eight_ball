@@ -3,7 +3,6 @@
 ## [3.2.0]
 
 - Upgrade Ruby to 3.4.5
-- Tighten `required_ruby_version` to `>= 3.4` now that all consumers are on Ruby 3.4
 
 ## [3.1.1]
 
