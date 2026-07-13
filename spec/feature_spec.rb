@@ -152,4 +152,23 @@ RSpec.describe EightBall::Feature do
       expect(f1 == f2).to be false
     end
   end
+
+  describe 'metadata' do
+    it 'should default to nil when not provided' do
+      feature = EightBall::Feature.new 'NoMeta'
+      expect(feature.metadata).to be_nil
+    end
+
+    it 'should expose the metadata hash when provided' do
+      meta = { 'type' => 'experiment', 'owner' => 'growth', 'expires_at' => '2026-12-31' }
+      feature = EightBall::Feature.new 'WithMeta', [], [], metadata: meta
+      expect(feature.metadata).to eq meta
+    end
+
+    it 'should not affect evaluation' do
+      meta = { 'type' => 'experiment' }
+      feature = EightBall::Feature.new 'WithMeta', [], [], metadata: meta
+      expect(feature.enabled?).to be true
+    end
+  end
 end

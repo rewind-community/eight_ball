@@ -4,7 +4,7 @@ module EightBall
   # A Feature is an element of your application that can be enabled or disabled
   # based on various {EightBall::Conditions}.
   class Feature
-    attr_reader :name, :enabled_for, :disabled_for
+    attr_reader :name, :enabled_for, :disabled_for, :metadata
 
     # Creates a new instance of an Interval RefreshPolicy.
     #
@@ -13,13 +13,16 @@ module EightBall
     #   The Condition(s) that need to be satisfied for the Feature to be enabled.
     # @param disabled_for [Array<EightBall::Conditions>, EightBall::Conditions]
     #   The Condition(s) that need to be satisfied for the Feature to be disabled.
+    # @param metadata [Hash, nil] Optional eval-agnostic metadata
+    #   (e.g. { "type" => ..., "owner" => ..., "expires_at" => ... }).
     #
     # @example A Feature which is always enabled
     #   feature = EightBall::Feature.new 'feature1', EightBall::Conditions::Always
-    def initialize(name, enabled_for = [], disabled_for = [])
+    def initialize(name, enabled_for = [], disabled_for = [], metadata: nil)
       @name = name
       @enabled_for = Array enabled_for
       @disabled_for = Array disabled_for
+      @metadata = metadata
     end
 
     # "EightBall, is this Feature enabled?"
