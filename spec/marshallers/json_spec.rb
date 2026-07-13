@@ -47,6 +47,29 @@ RSpec.describe EightBall::Marshallers::Json do
 
       expect(marshaller.marshall(features)).to eq json
     end
+
+    it 'should include top-level metadata when present' do
+      features = [
+        EightBall::Feature.new(
+          'WithMeta',
+          [EightBall::Conditions::Always.new],
+          [],
+          metadata: { 'type' => 'experiment', 'owner' => 'growth', 'expires_at' => '2026-12-31' }
+        )
+      ]
+
+      json = '[{"name":"WithMeta","enabledFor":[{"type":"always"}],"metadata":{"type":"experiment","owner":"growth","expiresAt":"2026-12-31"}}]'
+
+      expect(marshaller.marshall(features)).to eq json
+    end
+
+    it 'should omit metadata key when nil' do
+      features = [EightBall::Feature.new('NoMeta', [EightBall::Conditions::Always.new])]
+
+      json = '[{"name":"NoMeta","enabledFor":[{"type":"always"}]}]'
+
+      expect(marshaller.marshall(features)).to eq json
+    end
   end
 
   describe 'unmarshall' do
@@ -100,6 +123,38 @@ RSpec.describe EightBall::Marshallers::Json do
       features = marshaller.unmarshall ''
 
       expect(features).to eq []
+    end
+
+    it 'should round-trip metadata through unmarshall and marshall' do
+      json = %(
+        [{
+          "name": "WithMeta",
+          "enabledFor": [{ "type": "always" }],
+          "metadata": { "type": "experiment", "owner": "growth", "expiresAt": "2026-12-31" }
+        }]
+      )
+
+      features = marshaller.unmarshall json
+
+      expect(features.size).to be 1
+      # Keys are symbols: unmarshall parses with symbolize_names, so metadata
+      # (like every other unmarshalled hash) comes back symbol-keyed and snake-cased.
+      expect(features[0].metadata).to eq(
+        type: 'experiment', owner: 'growth', expires_at: '2026-12-31'
+      )
+
+      # Round-trip: marshalling what we unmarshalled reproduces the camelCase wire form.
+      expect(marshaller.marshall(features)).to eq(
+        '[{"name":"WithMeta","enabledFor":[{"type":"always"}],"metadata":{"type":"experiment","owner":"growth","expiresAt":"2026-12-31"}}]'
+      )
+    end
+
+    it 'should leave metadata nil when absent' do
+      json = %([{ "name": "NoMeta" }])
+
+      features = marshaller.unmarshall json
+
+      expect(features[0].metadata).to be_nil
     end
   end
 end

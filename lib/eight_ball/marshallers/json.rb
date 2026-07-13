@@ -70,7 +70,7 @@ module EightBall::Marshallers
         enabled_for = create_conditions_from_json feature[:enabled_for]
         disabled_for = create_conditions_from_json feature[:disabled_for]
 
-        EightBall::Feature.new feature[:name], enabled_for, disabled_for
+        EightBall::Feature.new feature[:name], enabled_for, disabled_for, metadata: feature[:metadata]
       end
     rescue JSON::ParserError => e
       EightBall.logger.error { "Failed to parse JSON: #{e.message}" }
@@ -86,6 +86,7 @@ module EightBall::Marshallers
 
       hash[:enabled_for] = feature.enabled_for.map { |condition| condition_to_hash(condition) } unless feature.enabled_for.empty?
       hash[:disabled_for] = feature.disabled_for.map { |condition| condition_to_hash(condition) } unless feature.disabled_for.empty?
+      hash[:metadata] = feature.metadata unless feature.metadata.nil?
 
       hash
     end
