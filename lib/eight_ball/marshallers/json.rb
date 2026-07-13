@@ -87,8 +87,11 @@ module EightBall::Marshallers
       disabled_for = create_conditions_from_json feature[:disabled_for]
 
       EightBall::Feature.new feature[:name], enabled_for, disabled_for, metadata: feature[:metadata]
-    rescue UnknownConditionType => e
-      EightBall.logger.warn { "Feature '#{feature[:name]}' has unknown condition type '#{e.message}'; marking it un-evaluable (OFF)" }
+    rescue UnknownConditionType, ArgumentError => e
+      # Fail ONLY this flag closed (OFF) for any unbuildable condition: an unknown
+      # type OR a known type with invalid params (e.g. a range missing min). Both
+      # would otherwise raise out of unmarshall and black out the whole blob.
+      EightBall.logger.warn { "Feature '#{feature[:name]}' has an invalid condition (#{e.message}); marking it un-evaluable (OFF)" }
       EightBall::Feature.new(feature[:name], [], [], metadata: feature[:metadata]).tap(&:un_evaluable!)
     end
 

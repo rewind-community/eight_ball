@@ -250,5 +250,29 @@ RSpec.describe EightBall::Marshallers::Json do
       expect(condition.parameter).to eq 'organization_id'
       expect(condition.percentage).to eq 25
     end
+
+    it 'should fail only the offending flag closed on a malformed known condition, not raise' do
+      # A KNOWN type with invalid params (range missing min/max) raises ArgumentError
+      # from the condition constructor; it must fail that flag closed, not black out the blob.
+      json = %(
+        [{
+          "name": "GoodFlag",
+          "enabledFor": [{ "type": "always" }]
+        }, {
+          "name": "BadRange",
+          "enabledFor": [{ "type": "range", "parameter": "accountId" }]
+        }]
+      )
+
+      features = nil
+      expect { features = marshaller.unmarshall(json) }.not_to raise_error
+
+      expect(features.size).to be 2
+      expect(features.find { |f| f.name == 'GoodFlag' }.enabled?).to be true
+
+      bad = features.find { |f| f.name == 'BadRange' }
+      expect(bad.un_evaluable?).to be true
+      expect(bad.enabled?).to be false
+    end
   end
 end
