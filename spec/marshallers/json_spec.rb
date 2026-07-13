@@ -70,6 +70,41 @@ RSpec.describe EightBall::Marshallers::Json do
 
       expect(marshaller.marshall(features)).to eq json
     end
+
+    it 'should marshall a percentage condition without leaking flag_name (fail-closed allowlist)' do
+      condition = EightBall::Conditions::Percentage.new(percentage: 25, parameter: 'organization_id')
+      condition.flag_name = 'Experiment' # runtime injection; must NEVER appear in JSON
+
+      features = [EightBall::Feature.new('Experiment', [condition])]
+
+      # parameter serializes snake_case: Base#parameter= snake-cases on construction and
+      # to_camelback_keys only transforms keys, not values (matches the canonical wire contract).
+      json = '[{"name":"Experiment","enabledFor":[{"type":"percentage","percentage":25,"parameter":"organization_id"}]}]'
+
+      result = marshaller.marshall(features)
+      expect(result).to eq json
+      # The allowlist guarantees the runtime salt is never serialized, by construction.
+      expect(result).not_to include 'flagName'
+      expect(result).not_to include 'flag_name'
+    end
+
+    it 'should round-trip every condition type through the allowlist unchanged' do
+      features = [
+        EightBall::Feature.new('AlwaysFlag', [EightBall::Conditions::Always.new]),
+        EightBall::Feature.new('NeverFlag', [EightBall::Conditions::Never.new]),
+        EightBall::Feature.new('ListFlag', [EightBall::Conditions::List.new(values: [1, 2, 3], parameter: 'param1')]),
+        EightBall::Feature.new('RangeFlag', [EightBall::Conditions::Range.new(min: 1, max: 5, parameter: 'accountId')]),
+        EightBall::Feature.new('PctFlag', [EightBall::Conditions::Percentage.new(percentage: 30, parameter: 'organizationId')])
+      ]
+
+      json = marshaller.marshall(features)
+
+      expect(json).to include '{"type":"always"}'
+      expect(json).to include '{"type":"never"}'
+      expect(json).to include '{"type":"list","values":[1,2,3],"parameter":"param1"}'
+      expect(json).to include '{"type":"range","min":1,"max":5,"parameter":"account_id"}'
+      expect(json).to include '{"type":"percentage","percentage":30,"parameter":"organization_id"}'
+    end
   end
 
   describe 'unmarshall' do
@@ -198,6 +233,22 @@ RSpec.describe EightBall::Marshallers::Json do
       end
 
       marshaller.unmarshall json
+    end
+
+    it 'should unmarshall a percentage condition' do
+      json = %(
+        [{
+          "name": "Experiment",
+          "enabledFor": [{ "type": "percentage", "parameter": "organizationId", "percentage": 25 }]
+        }]
+      )
+
+      features = marshaller.unmarshall json
+      condition = features[0].enabled_for[0]
+
+      expect(condition).to be_a EightBall::Conditions::Percentage
+      expect(condition.parameter).to eq 'organization_id'
+      expect(condition.percentage).to eq 25
     end
   end
 end

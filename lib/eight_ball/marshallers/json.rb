@@ -104,14 +104,31 @@ module EightBall::Marshallers
       hash
     end
 
-    def condition_to_hash(condition)
-      hash = {
-        type: condition.class.name.split('::').last.downcase
-      }
-      condition.instance_variables.each do |var|
-        next unless condition.instance_variable_get(var)
+    # Fail-closed allowlist: the exact wire fields each condition type serializes,
+    # in output order. Anything NOT listed here (e.g. the runtime-only @flag_name
+    # salt on percentage) is never written to the persisted blob. A new condition
+    # type, or a new wire field, must be added here deliberately; the default is to
+    # serialize nothing but the type. This is the opposite of the prior approach,
+    # which reflected over instance variables and wrote every truthy one with no
+    # exclusion list, leaking any runtime ivar the moment it existed.
+    CONDITION_WIRE_FIELDS = {
+      'always' => [],
+      'never' => [],
+      'list' => %i[values parameter],
+      'range' => %i[min max parameter],
+      'percentage' => %i[percentage parameter]
+    }.freeze
+    private_constant :CONDITION_WIRE_FIELDS
 
-        hash[var.to_s.delete('@')] = condition.instance_variable_get(var)
+    def condition_to_hash(condition)
+      type = condition.class.name.split('::').last.downcase
+      hash = { type: type }
+
+      CONDITION_WIRE_FIELDS.fetch(type, []).each do |field|
+        value = condition.public_send(field)
+        next if value.nil?
+
+        hash[field.to_s] = value
       end
 
       hash
