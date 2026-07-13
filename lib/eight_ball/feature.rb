@@ -4,7 +4,7 @@ module EightBall
   # A Feature is an element of your application that can be enabled or disabled
   # based on various {EightBall::Conditions}.
   class Feature
-    attr_reader :name, :enabled_for, :disabled_for, :metadata
+    attr_reader :name, :enabled_for, :disabled_for, :metadata, :source
 
     # Creates a new instance of an Interval RefreshPolicy.
     #
@@ -24,6 +24,7 @@ module EightBall
       @disabled_for = Array disabled_for
       @metadata = metadata
       @un_evaluable = false
+      @source = nil
 
       inject_flag_name @enabled_for
       inject_flag_name @disabled_for
@@ -60,12 +61,17 @@ module EightBall
     # Marks this Feature as un-evaluable. An un-evaluable Feature always
     # reports +false+ from {enabled?} and never inspects its Conditions.
     # Used by Marshallers to fail a single Feature closed (OFF) when its JSON
-    # contains an unknown Condition type, instead of raising and taking down
-    # the whole feature set.
+    # contains an unknown or malformed Condition, instead of raising and taking
+    # down the whole feature set.
     #
+    # @param source [Hash, nil] the raw unmarshalled feature hash, retained so a
+    #   Marshaller can re-emit an unparseable flag verbatim instead of dropping
+    #   its definition (which would flip it from fail-closed OFF to fail-open ON
+    #   on the next read).
     # @return [nil]
-    def un_evaluable!
+    def un_evaluable!(source = nil)
       @un_evaluable = true
+      @source = source
       nil
     end
 

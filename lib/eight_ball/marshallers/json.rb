@@ -92,10 +92,17 @@ module EightBall::Marshallers
       # type OR a known type with invalid params (e.g. a range missing min). Both
       # would otherwise raise out of unmarshall and black out the whole blob.
       EightBall.logger.warn { "Feature '#{feature[:name]}' has an invalid condition (#{e.message}); marking it un-evaluable (OFF)" }
-      EightBall::Feature.new(feature[:name], [], [], metadata: feature[:metadata]).tap(&:un_evaluable!)
+      # Retain the raw source so re-marshalling re-emits the unparseable flag verbatim
+      # (keeps it fail-closed on the next read; never drops the definition).
+      EightBall::Feature.new(feature[:name], [], [], metadata: feature[:metadata]).tap { |f| f.un_evaluable! feature }
     end
 
     def feature_to_hash(feature)
+      # An un-evaluable feature re-emits its original raw source verbatim, so a
+      # read -> marshall -> persist cycle neither drops the unparseable definition
+      # nor flips the flag from fail-closed OFF to fail-open ON.
+      return feature.source if feature.un_evaluable? && feature.source
+
       hash = {
         name: feature.name
       }

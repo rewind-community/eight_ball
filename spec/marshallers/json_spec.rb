@@ -274,5 +274,22 @@ RSpec.describe EightBall::Marshallers::Json do
       expect(bad.un_evaluable?).to be true
       expect(bad.enabled?).to be false
     end
+
+    it 'should preserve an un-evaluable flag verbatim across a marshall round-trip (no OFF->ON flip, no definition loss)' do
+      json = %([{ "name": "BadFlag", "enabledFor": [{ "type": "made_up_type", "parameter": "accountId" }] }])
+
+      once = marshaller.unmarshall(json)
+      expect(once[0].un_evaluable?).to be true
+      expect(once[0].enabled?).to be false
+
+      # Re-marshalling must re-emit the original (unparseable) condition, not drop it.
+      remarshalled = marshaller.marshall(once)
+      expect(remarshalled).to include 'made_up_type'
+
+      # Re-reading the re-marshalled blob keeps the flag fail-closed (OFF), never flips it ON.
+      twice = marshaller.unmarshall(remarshalled)
+      expect(twice[0].un_evaluable?).to be true
+      expect(twice[0].enabled?).to be false
+    end
   end
 end

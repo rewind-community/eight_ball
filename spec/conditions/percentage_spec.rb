@@ -83,12 +83,16 @@ RSpec.describe EightBall::Conditions::Percentage do
     end
 
     it 'should coerce the value to a string so 42 and "42" bucket identically' do
-      int_condition = build(percentage: 100, flag_name: 'F')
-      str_condition = build(percentage: 100, flag_name: 'F')
       int_bucket = Integer(Digest::SHA256.hexdigest('F:42')[0, 8], 16) % 100
-      # Same salt+stringified value must produce the same bucket whether passed 42 or "42".
-      expect(int_condition.satisfied?(42)).to eq str_condition.satisfied?('42')
       expect(int_bucket).to be_between(0, 99)
+
+      # Assert at a threshold that straddles the shared bucket, so the outcome depends
+      # on the actual bucket: a stringification regression (42 vs "42" bucketing
+      # differently) would make the integer and string subjects diverge here.
+      expect(build(percentage: int_bucket, flag_name: 'F').satisfied?(42)).to be false
+      expect(build(percentage: int_bucket, flag_name: 'F').satisfied?('42')).to be false
+      expect(build(percentage: int_bucket + 1, flag_name: 'F').satisfied?(42)).to be true
+      expect(build(percentage: int_bucket + 1, flag_name: 'F').satisfied?('42')).to be true
     end
 
     it 'should decorrelate an id across different flags (different salt)' do
