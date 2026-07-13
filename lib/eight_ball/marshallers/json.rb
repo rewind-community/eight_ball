@@ -37,6 +37,12 @@ require 'plissken'
 #   }]
 module EightBall::Marshallers
   class Json
+    # Raised internally by create_conditions_from_json when a Condition type is
+    # not recognized. Caught per-feature by unmarshall so a single bad Feature
+    # is failed closed (OFF) instead of taking down the whole feature set.
+    UnknownConditionType = Class.new(StandardError)
+    private_constant :UnknownConditionType
+
     # Convert the given {EightBall::Feature Features} into a JSON array.
     #
     # @param [Array<EightBall::Feature>] features The {EightBall::Feature Features} to convert.
@@ -67,10 +73,7 @@ module EightBall::Marshallers
       raise ArgumentError, 'JSON input was not an array' unless parsed.is_a? Array
 
       parsed.map do |feature|
-        enabled_for = create_conditions_from_json feature[:enabled_for]
-        disabled_for = create_conditions_from_json feature[:disabled_for]
-
-        EightBall::Feature.new feature[:name], enabled_for, disabled_for, metadata: feature[:metadata]
+        build_feature feature
       end
     rescue JSON::ParserError => e
       EightBall.logger.error { "Failed to parse JSON: #{e.message}" }
@@ -78,6 +81,16 @@ module EightBall::Marshallers
     end
 
     private
+
+    def build_feature(feature)
+      enabled_for = create_conditions_from_json feature[:enabled_for]
+      disabled_for = create_conditions_from_json feature[:disabled_for]
+
+      EightBall::Feature.new feature[:name], enabled_for, disabled_for, metadata: feature[:metadata]
+    rescue UnknownConditionType => e
+      EightBall.logger.warn { "Feature '#{feature[:name]}' has unknown condition type '#{e.message}'; marking it un-evaluable (OFF)" }
+      EightBall::Feature.new(feature[:name], [], [], metadata: feature[:metadata]).tap(&:un_evaluable!)
+    end
 
     def feature_to_hash(feature)
       hash = {
@@ -109,6 +122,8 @@ module EightBall::Marshallers
 
       json_conditions.map do |condition|
         condition_class = EightBall::Conditions.by_name condition[:type]
+        raise UnknownConditionType, condition[:type].to_s if condition_class.nil?
+
         condition_class.new condition
       end
     end

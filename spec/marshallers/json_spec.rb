@@ -156,5 +156,48 @@ RSpec.describe EightBall::Marshallers::Json do
 
       expect(features[0].metadata).to be_nil
     end
+
+    it 'should mark only the offending feature un-evaluable on unknown condition type, not raise' do
+      json = %(
+        [{
+          "name": "GoodFlag",
+          "enabledFor": [{ "type": "always" }]
+        }, {
+          "name": "BadFlag",
+          "enabledFor": [{ "type": "made_up_type", "parameter": "accountId", "values": [1] }]
+        }]
+      )
+
+      # Must not raise, and must not return [] (the old behaviour blacked out the whole blob).
+      features = nil
+      expect { features = marshaller.unmarshall(json) }.not_to raise_error
+
+      expect(features.size).to be 2
+
+      good = features.find { |f| f.name == 'GoodFlag' }
+      bad = features.find { |f| f.name == 'BadFlag' }
+
+      # GoodFlag still evaluates normally.
+      expect(good.un_evaluable?).to be false
+      expect(good.enabled?).to be true
+
+      # BadFlag is forced OFF and never evaluates its (unparseable) condition.
+      expect(bad.un_evaluable?).to be true
+      expect(bad.enabled?).to be false
+    end
+
+    it 'should log a warning naming the flag and the unknown type' do
+      json = %([{ "name": "BadFlag", "enabledFor": [{ "type": "made_up_type" }] }])
+
+      logger = instance_double(Logger)
+      allow(EightBall).to receive(:logger).and_return(logger)
+      expect(logger).to receive(:warn) do |&block|
+        message = block.call
+        expect(message).to include('BadFlag')
+        expect(message).to include('made_up_type')
+      end
+
+      marshaller.unmarshall json
+    end
   end
 end
