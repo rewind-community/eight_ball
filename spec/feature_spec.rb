@@ -171,4 +171,29 @@ RSpec.describe EightBall::Feature do
       expect(feature.enabled?).to be true
     end
   end
+
+  describe 'un_evaluable!' do
+    it 'should default to evaluable' do
+      feature = EightBall::Feature.new 'Feature', [EightBall::Conditions::Always.new]
+      expect(feature.un_evaluable?).to be false
+      expect(feature.enabled?).to be true
+    end
+
+    it 'should force enabled? to false once marked, regardless of conditions' do
+      feature = EightBall::Feature.new 'Feature', [EightBall::Conditions::Always.new]
+      feature.un_evaluable!
+
+      expect(feature.un_evaluable?).to be true
+      expect(feature.enabled?).to be false
+    end
+
+    it 'should not raise for missing parameters when un-evaluable' do
+      condition = EightBall::Conditions::List.new parameter: 'param1', values: [1, 2]
+      feature = EightBall::Feature.new 'Feature', condition
+      feature.un_evaluable!
+
+      # Normally this raises ArgumentError (missing param1); un-evaluable must short-circuit first.
+      expect(feature.enabled?).to be false
+    end
+  end
 end

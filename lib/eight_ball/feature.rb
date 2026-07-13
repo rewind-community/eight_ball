@@ -23,6 +23,7 @@ module EightBall
       @enabled_for = Array enabled_for
       @disabled_for = Array disabled_for
       @metadata = metadata
+      @un_evaluable = false
     end
 
     # "EightBall, is this Feature enabled?"
@@ -45,10 +46,29 @@ module EightBall
     # @example The Feature's {EightBall::Conditions} require an account ID
     #   feature.enabled? account_id: 123
     def enabled?(parameters = {})
+      return false if @un_evaluable
+
       return true if @enabled_for.empty? && @disabled_for.empty?
       return true if @enabled_for.empty? && !any_satisfied?(@disabled_for, parameters)
 
       any_satisfied?(@enabled_for, parameters) && !any_satisfied?(@disabled_for, parameters)
+    end
+
+    # Marks this Feature as un-evaluable. An un-evaluable Feature always
+    # reports +false+ from {enabled?} and never inspects its Conditions.
+    # Used by Marshallers to fail a single Feature closed (OFF) when its JSON
+    # contains an unknown Condition type, instead of raising and taking down
+    # the whole feature set.
+    #
+    # @return [nil]
+    def un_evaluable!
+      @un_evaluable = true
+      nil
+    end
+
+    # @return [Boolean] whether this Feature has been marked un-evaluable.
+    def un_evaluable?
+      @un_evaluable
     end
 
     def ==(other)
