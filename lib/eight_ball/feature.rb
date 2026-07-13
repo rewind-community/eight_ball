@@ -24,6 +24,9 @@ module EightBall
       @disabled_for = Array disabled_for
       @metadata = metadata
       @un_evaluable = false
+
+      inject_flag_name @enabled_for
+      inject_flag_name @disabled_for
     end
 
     # "EightBall, is this Feature enabled?"
@@ -90,6 +93,15 @@ module EightBall
         raise ArgumentError, "Missing parameter #{condition.parameter}" if value.nil?
 
         condition.satisfied? value
+      end
+    end
+
+    # Conditions do not know which Feature owns them, but the Percentage
+    # condition needs the flag name as its bucket salt. Inject it here, duck-typed
+    # so legacy conditions (always/never/list/range) are untouched.
+    def inject_flag_name(conditions)
+      conditions.each do |condition|
+        condition.flag_name = @name if condition.respond_to?(:flag_name=)
       end
     end
   end
