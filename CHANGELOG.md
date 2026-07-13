@@ -1,5 +1,11 @@
 # Changelog
 
+## [3.3.0]
+
+- Add `percentage` condition for sticky A/B bucketing. Canonical algorithm: `bucket = Integer(SHA256("<flagName>:<value>")[0,8], 16) % 100`, satisfied iff `bucket < percentage`; salted by flag name; default parameter `organization_id`. (REW-1198)
+- Harden JSON unmarshalling: a flag containing an unknown condition `type` now evaluates to `false` (OFF) and logs a warning, instead of raising and blacking out the entire feature set. Other flags in the blob are unaffected. (REW-1198)
+- Add optional top-level `metadata` (`type`, `owner`, `expires_at`) to `Feature`, preserved through marshall/unmarshall and ignored during evaluation. (REW-1198)
+
 ## [3.2.0]
 
 - Upgrade Ruby to 3.4.5
