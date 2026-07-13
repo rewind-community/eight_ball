@@ -152,4 +152,80 @@ RSpec.describe EightBall::Feature do
       expect(f1 == f2).to be false
     end
   end
+
+  describe 'metadata' do
+    it 'should default to nil when not provided' do
+      feature = EightBall::Feature.new 'NoMeta'
+      expect(feature.metadata).to be_nil
+    end
+
+    it 'should expose the metadata hash when provided' do
+      meta = { 'type' => 'experiment', 'owner' => 'growth', 'expires_at' => '2026-12-31' }
+      feature = EightBall::Feature.new 'WithMeta', [], [], metadata: meta
+      expect(feature.metadata).to eq meta
+    end
+
+    it 'should not affect evaluation' do
+      meta = { 'type' => 'experiment' }
+      feature = EightBall::Feature.new 'WithMeta', [], [], metadata: meta
+      expect(feature.enabled?).to be true
+    end
+  end
+
+  describe 'un_evaluable!' do
+    it 'should default to evaluable' do
+      feature = EightBall::Feature.new 'Feature', [EightBall::Conditions::Always.new]
+      expect(feature.un_evaluable?).to be false
+      expect(feature.enabled?).to be true
+    end
+
+    it 'should force enabled? to false once marked, regardless of conditions' do
+      feature = EightBall::Feature.new 'Feature', [EightBall::Conditions::Always.new]
+      feature.un_evaluable!
+
+      expect(feature.un_evaluable?).to be true
+      expect(feature.enabled?).to be false
+    end
+
+    it 'should not raise for missing parameters when un-evaluable' do
+      condition = EightBall::Conditions::List.new parameter: 'param1', values: [1, 2]
+      feature = EightBall::Feature.new 'Feature', condition
+      feature.un_evaluable!
+
+      # Normally this raises ArgumentError (missing param1); un-evaluable must short-circuit first.
+      expect(feature.enabled?).to be false
+    end
+  end
+
+  describe 'percentage condition integration' do
+    it 'should inject the flag name as the bucket salt at construction' do
+      condition = EightBall::Conditions::Percentage.new percentage: 50, parameter: 'organization_id'
+      EightBall::Feature.new 'SaltedFlag', [condition]
+
+      expect(condition.flag_name).to eq 'SaltedFlag'
+    end
+
+    it 'should evaluate a percentage condition end-to-end without raising' do
+      condition = EightBall::Conditions::Percentage.new percentage: 100, parameter: 'organization_id'
+      feature = EightBall::Feature.new 'Exp', [condition]
+
+      # percentage 100 => always on; the key assertion is that flag_name was
+      # injected so satisfied? does not raise the "flag_name has not been set" error.
+      expect(feature.enabled?(organization_id: 'org-1')).to be true
+    end
+
+    it 'should give the same verdict for the same org across repeated evaluations (sticky)' do
+      condition = EightBall::Conditions::Percentage.new percentage: 50, parameter: 'organization_id'
+      feature = EightBall::Feature.new 'Sticky', [condition]
+
+      first = feature.enabled?(organization_id: 'org-77')
+      5.times { expect(feature.enabled?(organization_id: 'org-77')).to eq first }
+    end
+
+    it 'should not inject flag_name into legacy conditions' do
+      list = EightBall::Conditions::List.new values: [1, 2], parameter: 'account_id'
+      expect { EightBall::Feature.new 'Legacy', [list] }.not_to raise_error
+      expect(list).not_to respond_to(:flag_name)
+    end
+  end
 end

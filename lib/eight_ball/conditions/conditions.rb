@@ -9,6 +9,7 @@ module EightBall::Conditions
       always: EightBall::Conditions::Always,
       list: EightBall::Conditions::List,
       never: EightBall::Conditions::Never,
+      percentage: EightBall::Conditions::Percentage,
       range: EightBall::Conditions::Range
     }
     mappings[name.downcase.to_sym]

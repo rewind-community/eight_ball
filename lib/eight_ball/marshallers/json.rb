@@ -37,6 +37,12 @@ require 'plissken'
 #   }]
 module EightBall::Marshallers
   class Json
+    # Raised internally by create_conditions_from_json when a Condition type is
+    # not recognized. Caught per-feature by unmarshall so a single bad Feature
+    # is failed closed (OFF) instead of taking down the whole feature set.
+    UnknownConditionType = Class.new(StandardError)
+    private_constant :UnknownConditionType
+
     # Convert the given {EightBall::Feature Features} into a JSON array.
     #
     # @param [Array<EightBall::Feature>] features The {EightBall::Feature Features} to convert.
@@ -67,10 +73,7 @@ module EightBall::Marshallers
       raise ArgumentError, 'JSON input was not an array' unless parsed.is_a? Array
 
       parsed.map do |feature|
-        enabled_for = create_conditions_from_json feature[:enabled_for]
-        disabled_for = create_conditions_from_json feature[:disabled_for]
-
-        EightBall::Feature.new feature[:name], enabled_for, disabled_for
+        build_feature feature
       end
     rescue JSON::ParserError => e
       EightBall.logger.error { "Failed to parse JSON: #{e.message}" }
@@ -79,25 +82,63 @@ module EightBall::Marshallers
 
     private
 
+    def build_feature(feature)
+      enabled_for = create_conditions_from_json feature[:enabled_for]
+      disabled_for = create_conditions_from_json feature[:disabled_for]
+
+      EightBall::Feature.new feature[:name], enabled_for, disabled_for, metadata: feature[:metadata]
+    rescue UnknownConditionType, ArgumentError => e
+      # Fail ONLY this flag closed (OFF) for any unbuildable condition: an unknown
+      # type OR a known type with invalid params (e.g. a range missing min). Both
+      # would otherwise raise out of unmarshall and black out the whole blob.
+      EightBall.logger.warn { "Feature '#{feature[:name]}' has an invalid condition (#{e.message}); marking it un-evaluable (OFF)" }
+      # Retain the raw source so re-marshalling re-emits the unparseable flag verbatim
+      # (keeps it fail-closed on the next read; never drops the definition).
+      EightBall::Feature.new(feature[:name], [], [], metadata: feature[:metadata]).tap { |f| f.un_evaluable! feature }
+    end
+
     def feature_to_hash(feature)
+      # An un-evaluable feature re-emits its original raw source verbatim, so a
+      # read -> marshall -> persist cycle neither drops the unparseable definition
+      # nor flips the flag from fail-closed OFF to fail-open ON.
+      return feature.source if feature.un_evaluable? && feature.source
+
       hash = {
         name: feature.name
       }
 
       hash[:enabled_for] = feature.enabled_for.map { |condition| condition_to_hash(condition) } unless feature.enabled_for.empty?
       hash[:disabled_for] = feature.disabled_for.map { |condition| condition_to_hash(condition) } unless feature.disabled_for.empty?
+      hash[:metadata] = feature.metadata unless feature.metadata.nil?
 
       hash
     end
 
-    def condition_to_hash(condition)
-      hash = {
-        type: condition.class.name.split('::').last.downcase
-      }
-      condition.instance_variables.each do |var|
-        next unless condition.instance_variable_get(var)
+    # Fail-closed allowlist: the exact wire fields each condition type serializes,
+    # in output order. Anything NOT listed here (e.g. the runtime-only @flag_name
+    # salt on percentage) is never written to the persisted blob. A new condition
+    # type, or a new wire field, must be added here deliberately; the default is to
+    # serialize nothing but the type. This is the opposite of the prior approach,
+    # which reflected over instance variables and wrote every truthy one with no
+    # exclusion list, leaking any runtime ivar the moment it existed.
+    CONDITION_WIRE_FIELDS = {
+      'always' => [],
+      'never' => [],
+      'list' => %i[values parameter],
+      'range' => %i[min max parameter],
+      'percentage' => %i[percentage parameter]
+    }.freeze
+    private_constant :CONDITION_WIRE_FIELDS
 
-        hash[var.to_s.delete('@')] = condition.instance_variable_get(var)
+    def condition_to_hash(condition)
+      type = condition.class.name.split('::').last.downcase
+      hash = { type: type }
+
+      CONDITION_WIRE_FIELDS.fetch(type, []).each do |field|
+        value = condition.public_send(field)
+        next if value.nil?
+
+        hash[field.to_s] = value
       end
 
       hash
@@ -108,6 +149,8 @@ module EightBall::Marshallers
 
       json_conditions.map do |condition|
         condition_class = EightBall::Conditions.by_name condition[:type]
+        raise UnknownConditionType, condition[:type].to_s if condition_class.nil?
+
         condition_class.new condition
       end
     end

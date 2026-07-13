@@ -4,7 +4,7 @@ module EightBall
   # A Feature is an element of your application that can be enabled or disabled
   # based on various {EightBall::Conditions}.
   class Feature
-    attr_reader :name, :enabled_for, :disabled_for
+    attr_reader :name, :enabled_for, :disabled_for, :metadata, :source
 
     # Creates a new instance of an Interval RefreshPolicy.
     #
@@ -13,13 +13,21 @@ module EightBall
     #   The Condition(s) that need to be satisfied for the Feature to be enabled.
     # @param disabled_for [Array<EightBall::Conditions>, EightBall::Conditions]
     #   The Condition(s) that need to be satisfied for the Feature to be disabled.
+    # @param metadata [Hash, nil] Optional eval-agnostic metadata
+    #   (e.g. { "type" => ..., "owner" => ..., "expires_at" => ... }).
     #
     # @example A Feature which is always enabled
     #   feature = EightBall::Feature.new 'feature1', EightBall::Conditions::Always
-    def initialize(name, enabled_for = [], disabled_for = [])
+    def initialize(name, enabled_for = [], disabled_for = [], metadata: nil)
       @name = name
       @enabled_for = Array enabled_for
       @disabled_for = Array disabled_for
+      @metadata = metadata
+      @un_evaluable = false
+      @source = nil
+
+      inject_flag_name @enabled_for
+      inject_flag_name @disabled_for
     end
 
     # "EightBall, is this Feature enabled?"
@@ -42,10 +50,34 @@ module EightBall
     # @example The Feature's {EightBall::Conditions} require an account ID
     #   feature.enabled? account_id: 123
     def enabled?(parameters = {})
+      return false if @un_evaluable
+
       return true if @enabled_for.empty? && @disabled_for.empty?
       return true if @enabled_for.empty? && !any_satisfied?(@disabled_for, parameters)
 
       any_satisfied?(@enabled_for, parameters) && !any_satisfied?(@disabled_for, parameters)
+    end
+
+    # Marks this Feature as un-evaluable. An un-evaluable Feature always
+    # reports +false+ from {enabled?} and never inspects its Conditions.
+    # Used by Marshallers to fail a single Feature closed (OFF) when its JSON
+    # contains an unknown or malformed Condition, instead of raising and taking
+    # down the whole feature set.
+    #
+    # @param source [Hash, nil] the raw unmarshalled feature hash, retained so a
+    #   Marshaller can re-emit an unparseable flag verbatim instead of dropping
+    #   its definition (which would flip it from fail-closed OFF to fail-open ON
+    #   on the next read).
+    # @return [nil]
+    def un_evaluable!(source = nil)
+      @un_evaluable = true
+      @source = source
+      nil
+    end
+
+    # @return [Boolean] whether this Feature has been marked un-evaluable.
+    def un_evaluable?
+      @un_evaluable
     end
 
     def ==(other)
@@ -67,6 +99,15 @@ module EightBall
         raise ArgumentError, "Missing parameter #{condition.parameter}" if value.nil?
 
         condition.satisfied? value
+      end
+    end
+
+    # Conditions do not know which Feature owns them, but the Percentage
+    # condition needs the flag name as its bucket salt. Inject it here, duck-typed
+    # so legacy conditions (always/never/list/range) are untouched.
+    def inject_flag_name(conditions)
+      conditions.each do |condition|
+        condition.flag_name = @name if condition.respond_to?(:flag_name=)
       end
     end
   end

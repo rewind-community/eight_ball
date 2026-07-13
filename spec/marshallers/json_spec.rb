@@ -47,6 +47,64 @@ RSpec.describe EightBall::Marshallers::Json do
 
       expect(marshaller.marshall(features)).to eq json
     end
+
+    it 'should include top-level metadata when present' do
+      features = [
+        EightBall::Feature.new(
+          'WithMeta',
+          [EightBall::Conditions::Always.new],
+          [],
+          metadata: { 'type' => 'experiment', 'owner' => 'growth', 'expires_at' => '2026-12-31' }
+        )
+      ]
+
+      json = '[{"name":"WithMeta","enabledFor":[{"type":"always"}],"metadata":{"type":"experiment","owner":"growth","expiresAt":"2026-12-31"}}]'
+
+      expect(marshaller.marshall(features)).to eq json
+    end
+
+    it 'should omit metadata key when nil' do
+      features = [EightBall::Feature.new('NoMeta', [EightBall::Conditions::Always.new])]
+
+      json = '[{"name":"NoMeta","enabledFor":[{"type":"always"}]}]'
+
+      expect(marshaller.marshall(features)).to eq json
+    end
+
+    it 'should marshall a percentage condition without leaking flag_name (fail-closed allowlist)' do
+      condition = EightBall::Conditions::Percentage.new(percentage: 25, parameter: 'organization_id')
+      condition.flag_name = 'Experiment' # runtime injection; must NEVER appear in JSON
+
+      features = [EightBall::Feature.new('Experiment', [condition])]
+
+      # parameter serializes snake_case: Base#parameter= snake-cases on construction and
+      # to_camelback_keys only transforms keys, not values (matches the canonical wire contract).
+      json = '[{"name":"Experiment","enabledFor":[{"type":"percentage","percentage":25,"parameter":"organization_id"}]}]'
+
+      result = marshaller.marshall(features)
+      expect(result).to eq json
+      # The allowlist guarantees the runtime salt is never serialized, by construction.
+      expect(result).not_to include 'flagName'
+      expect(result).not_to include 'flag_name'
+    end
+
+    it 'should round-trip every condition type through the allowlist unchanged' do
+      features = [
+        EightBall::Feature.new('AlwaysFlag', [EightBall::Conditions::Always.new]),
+        EightBall::Feature.new('NeverFlag', [EightBall::Conditions::Never.new]),
+        EightBall::Feature.new('ListFlag', [EightBall::Conditions::List.new(values: [1, 2, 3], parameter: 'param1')]),
+        EightBall::Feature.new('RangeFlag', [EightBall::Conditions::Range.new(min: 1, max: 5, parameter: 'accountId')]),
+        EightBall::Feature.new('PctFlag', [EightBall::Conditions::Percentage.new(percentage: 30, parameter: 'organizationId')])
+      ]
+
+      json = marshaller.marshall(features)
+
+      expect(json).to include '{"type":"always"}'
+      expect(json).to include '{"type":"never"}'
+      expect(json).to include '{"type":"list","values":[1,2,3],"parameter":"param1"}'
+      expect(json).to include '{"type":"range","min":1,"max":5,"parameter":"account_id"}'
+      expect(json).to include '{"type":"percentage","percentage":30,"parameter":"organization_id"}'
+    end
   end
 
   describe 'unmarshall' do
@@ -100,6 +158,138 @@ RSpec.describe EightBall::Marshallers::Json do
       features = marshaller.unmarshall ''
 
       expect(features).to eq []
+    end
+
+    it 'should round-trip metadata through unmarshall and marshall' do
+      json = %(
+        [{
+          "name": "WithMeta",
+          "enabledFor": [{ "type": "always" }],
+          "metadata": { "type": "experiment", "owner": "growth", "expiresAt": "2026-12-31" }
+        }]
+      )
+
+      features = marshaller.unmarshall json
+
+      expect(features.size).to be 1
+      # Keys are symbols: unmarshall parses with symbolize_names, so metadata
+      # (like every other unmarshalled hash) comes back symbol-keyed and snake-cased.
+      expect(features[0].metadata).to eq(
+        type: 'experiment', owner: 'growth', expires_at: '2026-12-31'
+      )
+
+      # Round-trip: marshalling what we unmarshalled reproduces the camelCase wire form.
+      expect(marshaller.marshall(features)).to eq(
+        '[{"name":"WithMeta","enabledFor":[{"type":"always"}],"metadata":{"type":"experiment","owner":"growth","expiresAt":"2026-12-31"}}]'
+      )
+    end
+
+    it 'should leave metadata nil when absent' do
+      json = %([{ "name": "NoMeta" }])
+
+      features = marshaller.unmarshall json
+
+      expect(features[0].metadata).to be_nil
+    end
+
+    it 'should mark only the offending feature un-evaluable on unknown condition type, not raise' do
+      json = %(
+        [{
+          "name": "GoodFlag",
+          "enabledFor": [{ "type": "always" }]
+        }, {
+          "name": "BadFlag",
+          "enabledFor": [{ "type": "made_up_type", "parameter": "accountId", "values": [1] }]
+        }]
+      )
+
+      # Must not raise, and must not return [] (the old behaviour blacked out the whole blob).
+      features = nil
+      expect { features = marshaller.unmarshall(json) }.not_to raise_error
+
+      expect(features.size).to be 2
+
+      good = features.find { |f| f.name == 'GoodFlag' }
+      bad = features.find { |f| f.name == 'BadFlag' }
+
+      # GoodFlag still evaluates normally.
+      expect(good.un_evaluable?).to be false
+      expect(good.enabled?).to be true
+
+      # BadFlag is forced OFF and never evaluates its (unparseable) condition.
+      expect(bad.un_evaluable?).to be true
+      expect(bad.enabled?).to be false
+    end
+
+    it 'should log a warning naming the flag and the unknown type' do
+      json = %([{ "name": "BadFlag", "enabledFor": [{ "type": "made_up_type" }] }])
+
+      logger = instance_double(Logger)
+      allow(EightBall).to receive(:logger).and_return(logger)
+      expect(logger).to receive(:warn) do |&block|
+        message = block.call
+        expect(message).to include('BadFlag')
+        expect(message).to include('made_up_type')
+      end
+
+      marshaller.unmarshall json
+    end
+
+    it 'should unmarshall a percentage condition' do
+      json = %(
+        [{
+          "name": "Experiment",
+          "enabledFor": [{ "type": "percentage", "parameter": "organizationId", "percentage": 25 }]
+        }]
+      )
+
+      features = marshaller.unmarshall json
+      condition = features[0].enabled_for[0]
+
+      expect(condition).to be_a EightBall::Conditions::Percentage
+      expect(condition.parameter).to eq 'organization_id'
+      expect(condition.percentage).to eq 25
+    end
+
+    it 'should fail only the offending flag closed on a malformed known condition, not raise' do
+      # A KNOWN type with invalid params (range missing min/max) raises ArgumentError
+      # from the condition constructor; it must fail that flag closed, not black out the blob.
+      json = %(
+        [{
+          "name": "GoodFlag",
+          "enabledFor": [{ "type": "always" }]
+        }, {
+          "name": "BadRange",
+          "enabledFor": [{ "type": "range", "parameter": "accountId" }]
+        }]
+      )
+
+      features = nil
+      expect { features = marshaller.unmarshall(json) }.not_to raise_error
+
+      expect(features.size).to be 2
+      expect(features.find { |f| f.name == 'GoodFlag' }.enabled?).to be true
+
+      bad = features.find { |f| f.name == 'BadRange' }
+      expect(bad.un_evaluable?).to be true
+      expect(bad.enabled?).to be false
+    end
+
+    it 'should preserve an un-evaluable flag verbatim across a marshall round-trip (no OFF->ON flip, no definition loss)' do
+      json = %([{ "name": "BadFlag", "enabledFor": [{ "type": "made_up_type", "parameter": "accountId" }] }])
+
+      once = marshaller.unmarshall(json)
+      expect(once[0].un_evaluable?).to be true
+      expect(once[0].enabled?).to be false
+
+      # Re-marshalling must re-emit the original (unparseable) condition, not drop it.
+      remarshalled = marshaller.marshall(once)
+      expect(remarshalled).to include 'made_up_type'
+
+      # Re-reading the re-marshalled blob keeps the flag fail-closed (OFF), never flips it ON.
+      twice = marshaller.unmarshall(remarshalled)
+      expect(twice[0].un_evaluable?).to be true
+      expect(twice[0].enabled?).to be false
     end
   end
 end
