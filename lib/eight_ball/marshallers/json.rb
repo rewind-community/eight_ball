@@ -37,9 +37,8 @@ require 'plissken'
 #   }]
 module EightBall::Marshallers
   class Json
-    # Raised internally by create_conditions_from_json when a Condition type is
-    # not recognized. Caught per-feature by unmarshall so a single bad Feature
-    # is failed closed (OFF) instead of taking down the whole feature set.
+    # Raised when a condition cannot be built; caught per-feature to fail that
+    # single flag closed (OFF).
     UnknownConditionType = Class.new(StandardError)
     private_constant :UnknownConditionType
 
@@ -88,19 +87,13 @@ module EightBall::Marshallers
 
       EightBall::Feature.new feature[:name], enabled_for, disabled_for, metadata: feature[:metadata]
     rescue UnknownConditionType, ArgumentError => e
-      # Fail ONLY this flag closed (OFF) for any unbuildable condition: an unknown
-      # type OR a known type with invalid params (e.g. a range missing min). Both
-      # would otherwise raise out of unmarshall and black out the whole blob.
       EightBall.logger.warn { "Feature '#{feature[:name]}' has an invalid condition (#{e.message}); marking it un-evaluable (OFF)" }
-      # Retain the raw source so re-marshalling re-emits the unparseable flag verbatim
-      # (keeps it fail-closed on the next read; never drops the definition).
+      # Keep the raw source so re-marshalling re-emits the flag unchanged.
       EightBall::Feature.new(feature[:name], [], [], metadata: feature[:metadata]).tap { |f| f.un_evaluable! feature }
     end
 
     def feature_to_hash(feature)
-      # An un-evaluable feature re-emits its original raw source verbatim, so a
-      # read -> marshall -> persist cycle neither drops the unparseable definition
-      # nor flips the flag from fail-closed OFF to fail-open ON.
+      # Un-evaluable features re-emit their raw source unchanged.
       return feature.source if feature.un_evaluable? && feature.source
 
       hash = {
@@ -114,13 +107,8 @@ module EightBall::Marshallers
       hash
     end
 
-    # Fail-closed allowlist: the exact wire fields each condition type serializes,
-    # in output order. Anything NOT listed here (e.g. the runtime-only @flag_name
-    # salt on percentage) is never written to the persisted blob. A new condition
-    # type, or a new wire field, must be added here deliberately; the default is to
-    # serialize nothing but the type. This is the opposite of the prior approach,
-    # which reflected over instance variables and wrote every truthy one with no
-    # exclusion list, leaking any runtime ivar the moment it existed.
+    # Wire fields each condition type serializes, in output order. Anything not
+    # listed (e.g. percentage's runtime flag_name salt) is never persisted.
     CONDITION_WIRE_FIELDS = {
       'always' => [],
       'never' => [],

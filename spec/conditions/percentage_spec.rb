@@ -86,9 +86,8 @@ RSpec.describe EightBall::Conditions::Percentage do
       int_bucket = Integer(Digest::SHA256.hexdigest('F:42')[0, 8], 16) % 100
       expect(int_bucket).to be_between(0, 99)
 
-      # Assert at a threshold that straddles the shared bucket, so the outcome depends
-      # on the actual bucket: a stringification regression (42 vs "42" bucketing
-      # differently) would make the integer and string subjects diverge here.
+      # At a threshold straddling the shared bucket, int and string subjects must
+      # agree; a coercion regression would diverge here.
       expect(build(percentage: int_bucket, flag_name: 'F').satisfied?(42)).to be false
       expect(build(percentage: int_bucket, flag_name: 'F').satisfied?('42')).to be false
       expect(build(percentage: int_bucket + 1, flag_name: 'F').satisfied?(42)).to be true
@@ -103,9 +102,8 @@ RSpec.describe EightBall::Conditions::Percentage do
       # The three fixed names do not all bucket the same value identically.
       expect(buckets.values.uniq.size).to be > 1
 
-      # Prove the REAL condition uses the flag name as salt: each flag's verdict tracks
-      # ITS OWN bucket. A bug that ignored flag_name would bucket every flag identically
-      # and break these per-flag thresholds.
+      # Each flag's verdict must track its own salted bucket; a flag_name-agnostic
+      # bug would fail here.
       buckets.each do |flag, bucket|
         expect(build(percentage: bucket, flag_name: flag).satisfied?(value)).to be false
         expect(build(percentage: bucket + 1, flag_name: flag).satisfied?(value)).to be true

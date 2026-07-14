@@ -83,7 +83,7 @@ A Condition must either be `true` or `false`. It describes when a Feature is ena
 - [Range](lib/eight_ball/conditions/range.rb): This condition is satisfied if the given value is within the specified range (inclusive).
 - [Percentage](lib/eight_ball/conditions/percentage.rb): This condition is satisfied for a deterministic, sticky subset of subjects sized to `percentage` percent. Bucketing is salted by the flag name so a subject is decorrelated across flags. Wire form: `{"type":"percentage","parameter":"account_id","percentage":<0..100>}`.
 
-#### Sticky percentage bucketing (spec of record)
+#### Sticky percentage bucketing
 
 The `percentage` condition buckets a subject deterministically:
 
@@ -92,7 +92,7 @@ bucket = Integer(Digest::SHA256.hexdigest("#{flagName}:#{value}")[0, 8], 16) % 1
 satisfied  iff  bucket < percentage
 ```
 
-The salt is the **flag name**, so the same `account_id` lands in independent buckets across different flags. `value` is stringified before hashing. This is the canonical algorithm; any future port (e.g. a TypeScript SDK) must reproduce it exactly to stay consistent with the Ruby evaluator.
+The salt is the **flag name**, so the same `account_id` lands in independent buckets across different flags. `value` is stringified before hashing. Any reimplementation must reproduce it exactly to produce the same buckets.
 
 **Re-randomizing requires a rename.** Because the salt is the flag name, an experiment cannot be re-randomized on the same flag. The salt is stable for the life of the name (this is what decorrelates a subject across flags), so a subject's bucket for a given flag is fixed forever. Changing `percentage` only moves the threshold (it does not reshuffle buckets); to draw fresh buckets, rename the flag.
 

@@ -58,16 +58,11 @@ module EightBall
       any_satisfied?(@enabled_for, parameters) && !any_satisfied?(@disabled_for, parameters)
     end
 
-    # Marks this Feature as un-evaluable. An un-evaluable Feature always
-    # reports +false+ from {enabled?} and never inspects its Conditions.
-    # Used by Marshallers to fail a single Feature closed (OFF) when its JSON
-    # contains an unknown or malformed Condition, instead of raising and taking
-    # down the whole feature set.
+    # Marks this Feature un-evaluable: {enabled?} always returns +false+ and its
+    # Conditions are never inspected. Used by Marshallers to fail a bad flag closed.
     #
-    # @param source [Hash, nil] the raw unmarshalled feature hash, retained so a
-    #   Marshaller can re-emit an unparseable flag verbatim instead of dropping
-    #   its definition (which would flip it from fail-closed OFF to fail-open ON
-    #   on the next read).
+    # @param source [Hash, nil] the raw unmarshalled feature hash, kept so a
+    #   Marshaller can re-emit the flag unchanged.
     # @return [nil]
     def un_evaluable!(source = nil)
       @un_evaluable = true
@@ -102,9 +97,8 @@ module EightBall
       end
     end
 
-    # Conditions do not know which Feature owns them, but the Percentage
-    # condition needs the flag name as its bucket salt. Inject it here, duck-typed
-    # so legacy conditions (always/never/list/range) are untouched.
+    # Percentage conditions bucket on a salt of the flag name; give any condition
+    # that accepts it the owning name. Others are untouched.
     def inject_flag_name(conditions)
       conditions.each do |condition|
         condition.flag_name = @name if condition.respond_to?(:flag_name=)

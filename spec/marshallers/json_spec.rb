@@ -77,8 +77,8 @@ RSpec.describe EightBall::Marshallers::Json do
 
       features = [EightBall::Feature.new('Experiment', [condition])]
 
-      # parameter serializes snake_case: Base#parameter= snake-cases on construction and
-      # to_camelback_keys only transforms keys, not values (matches the canonical wire contract).
+      # parameter serializes snake_case: Base#parameter= snake-cases on construction, and
+      # to_camelback_keys only transforms keys, not values.
       json = '[{"name":"Experiment","enabledFor":[{"type":"percentage","percentage":25,"parameter":"account_id"}]}]'
 
       result = marshaller.marshall(features)
@@ -203,7 +203,7 @@ RSpec.describe EightBall::Marshallers::Json do
         }]
       )
 
-      # Must not raise, and must not return [] (the old behaviour blacked out the whole blob).
+      # Must not raise and must not return []; the bad flag fails closed, the rest parse.
       features = nil
       expect { features = marshaller.unmarshall(json) }.not_to raise_error
 
