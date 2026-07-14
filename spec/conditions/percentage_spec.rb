@@ -13,7 +13,7 @@ RSpec.describe EightBall::Conditions::Percentage do
 
   describe 'initialize' do
     it 'should raise if percentage is missing' do
-      expect { EightBall::Conditions::Percentage.new(parameter: 'organization_id') }
+      expect { EightBall::Conditions::Percentage.new(parameter: 'account_id') }
         .to raise_error ArgumentError, 'Missing value for percentage'
     end
 
@@ -26,8 +26,8 @@ RSpec.describe EightBall::Conditions::Percentage do
         .to raise_error ArgumentError, 'percentage must be an integer between 0 and 100'
     end
 
-    it 'should default parameter to organization_id' do
-      expect(EightBall::Conditions::Percentage.new(percentage: 50).parameter).to eq 'organization_id'
+    it 'should leave parameter nil when not provided' do
+      expect(EightBall::Conditions::Percentage.new(percentage: 50).parameter).to be_nil
     end
 
     it 'should accept an explicit parameter (snake-cased by Base)' do
@@ -48,7 +48,7 @@ RSpec.describe EightBall::Conditions::Percentage do
 
     it 'should match the canonical bucket formula exactly' do
       condition = build(percentage: 100, flag_name: 'MyFlag')
-      value = 'org-42'
+      value = 'acct-42'
 
       expected_bucket = Integer(Digest::SHA256.hexdigest("MyFlag:#{value}")[0, 8], 16) % 100
       # percentage 100 => always satisfied; assert the bucket math is the documented one.
@@ -58,7 +58,7 @@ RSpec.describe EightBall::Conditions::Percentage do
 
     it 'should be satisfied iff bucket < percentage' do
       flag = 'BucketFlag'
-      value = 'org-7'
+      value = 'acct-7'
       bucket = Integer(Digest::SHA256.hexdigest("#{flag}:#{value}")[0, 8], 16) % 100
 
       # Just below the bucket => not satisfied; just above => satisfied.
@@ -78,8 +78,8 @@ RSpec.describe EightBall::Conditions::Percentage do
 
     it 'should be deterministic (sticky) for the same flag + value' do
       condition = build(percentage: 50, flag_name: 'StickyFlag')
-      first = condition.satisfied?('org-99')
-      10.times { expect(condition.satisfied?('org-99')).to eq first }
+      first = condition.satisfied?('acct-99')
+      10.times { expect(condition.satisfied?('acct-99')).to eq first }
     end
 
     it 'should coerce the value to a string so 42 and "42" bucket identically' do
@@ -96,7 +96,7 @@ RSpec.describe EightBall::Conditions::Percentage do
     end
 
     it 'should decorrelate an id across different flags (flag name is the salt)' do
-      value = 'org-123'
+      value = 'acct-123'
       buckets = %w[FlagA FlagB FlagC].to_h do |flag|
         [flag, Integer(Digest::SHA256.hexdigest("#{flag}:#{value}")[0, 8], 16) % 100]
       end
@@ -115,8 +115,8 @@ RSpec.describe EightBall::Conditions::Percentage do
 
   describe '==' do
     it 'should be equal for same parameter and percentage' do
-      c1 = EightBall::Conditions::Percentage.new percentage: 30, parameter: 'organization_id'
-      c2 = EightBall::Conditions::Percentage.new percentage: 30, parameter: 'organization_id'
+      c1 = EightBall::Conditions::Percentage.new percentage: 30, parameter: 'account_id'
+      c2 = EightBall::Conditions::Percentage.new percentage: 30, parameter: 'account_id'
       expect(c1 == c2).to be true
     end
 
@@ -127,8 +127,8 @@ RSpec.describe EightBall::Conditions::Percentage do
     end
 
     it 'should differ when parameter differs' do
-      c1 = EightBall::Conditions::Percentage.new percentage: 30, parameter: 'organization_id'
-      c2 = EightBall::Conditions::Percentage.new percentage: 30, parameter: 'account_id'
+      c1 = EightBall::Conditions::Percentage.new percentage: 30, parameter: 'account_id'
+      c2 = EightBall::Conditions::Percentage.new percentage: 30, parameter: 'region_name'
       expect(c1 == c2).to be false
     end
   end

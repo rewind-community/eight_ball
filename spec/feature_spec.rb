@@ -199,27 +199,27 @@ RSpec.describe EightBall::Feature do
 
   describe 'percentage condition integration' do
     it 'should inject the flag name as the bucket salt at construction' do
-      condition = EightBall::Conditions::Percentage.new percentage: 50, parameter: 'organization_id'
+      condition = EightBall::Conditions::Percentage.new percentage: 50, parameter: 'account_id'
       EightBall::Feature.new 'SaltedFlag', [condition]
 
       expect(condition.flag_name).to eq 'SaltedFlag'
     end
 
     it 'should evaluate a percentage condition end-to-end without raising' do
-      condition = EightBall::Conditions::Percentage.new percentage: 100, parameter: 'organization_id'
+      condition = EightBall::Conditions::Percentage.new percentage: 100, parameter: 'account_id'
       feature = EightBall::Feature.new 'Exp', [condition]
 
       # percentage 100 => always on; the key assertion is that flag_name was
       # injected so satisfied? does not raise the "flag_name has not been set" error.
-      expect(feature.enabled?(organization_id: 'org-1')).to be true
+      expect(feature.enabled?(account_id: 'acct-1')).to be true
     end
 
-    it 'should give the same verdict for the same org across repeated evaluations (sticky)' do
-      condition = EightBall::Conditions::Percentage.new percentage: 50, parameter: 'organization_id'
+    it 'should give the same verdict for the same subject across repeated evaluations (sticky)' do
+      condition = EightBall::Conditions::Percentage.new percentage: 50, parameter: 'account_id'
       feature = EightBall::Feature.new 'Sticky', [condition]
 
-      first = feature.enabled?(organization_id: 'org-77')
-      5.times { expect(feature.enabled?(organization_id: 'org-77')).to eq first }
+      first = feature.enabled?(account_id: 'acct-77')
+      5.times { expect(feature.enabled?(account_id: 'acct-77')).to eq first }
     end
 
     it 'should not inject flag_name into legacy conditions' do

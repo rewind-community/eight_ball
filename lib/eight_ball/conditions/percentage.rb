@@ -12,14 +12,14 @@ module EightBall::Conditions
   #   satisfied iff bucket < percentage
   #
   # The salt is the owning flag's name, so a given value (e.g. an
-  # organization_id) is decorrelated across different flags/experiments.
+  # account_id) is decorrelated across different flags/experiments.
   # +flag_name+ is injected by {EightBall::Feature} at construction time
   # because Conditions do not otherwise know which Feature owns them.
   #
   # Limitation (by design): because the bucket salt is the flag name, an
   # experiment CANNOT be re-randomized on the same flag. The salt is stable for
-  # the life of the name, which is what decorrelates an org across flags but also
-  # fixes that org's bucket for that flag forever. To re-draw buckets (a fresh
+  # the life of the name, which is what decorrelates a subject across flags but also
+  # fixes that subject's bucket for that flag forever. To re-draw buckets (a fresh
   # randomization) you must rename the flag (a new name is a new salt). Changing
   # +percentage+ only moves the threshold; it does not reshuffle who is in which
   # bucket.
@@ -29,9 +29,8 @@ module EightBall::Conditions
     # @param [Hash] options
     # @option options [Integer] :percentage Integer 0..100. 0 is never
     #   satisfied; 100 is always satisfied.
-    # @option options [String] :parameter The attribute to bucket on.
-    #   Defaults to "organization_id"; use "account_id" for instance-scoped
-    #   experiments.
+    # @option options [String] :parameter The attribute to bucket on
+    #   (e.g. "account_id"). Caller-supplied, like the other parameterized conditions.
     def initialize(options = {})
       options ||= {}
 
@@ -45,7 +44,7 @@ module EightBall::Conditions
       @percentage = percentage
       @flag_name = nil
 
-      self.parameter = options[:parameter] || 'organization_id'
+      self.parameter = options[:parameter]
     end
 
     # Injected by {EightBall::Feature} so the bucket can be salted by flag name.
