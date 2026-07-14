@@ -148,6 +148,8 @@ module EightBall::Marshallers
       return [] unless json_conditions&.is_a?(Array)
 
       json_conditions.map do |condition|
+        raise UnknownConditionType, "not a condition object: #{condition.class}" unless condition.is_a?(Hash)
+
         condition_class = EightBall::Conditions.by_name condition[:type]
         raise UnknownConditionType, condition[:type].to_s if condition_class.nil?
 

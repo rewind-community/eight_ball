@@ -291,5 +291,29 @@ RSpec.describe EightBall::Marshallers::Json do
       expect(twice[0].un_evaluable?).to be true
       expect(twice[0].enabled?).to be false
     end
+
+    it 'should fail only the offending flag closed on a non-object condition entry, not raise' do
+      # A condition entry that is not an object (string/number/null) must not blow up the
+      # whole unmarshall; it fails only that flag closed, like any other unbuildable condition.
+      json = %(
+        [{
+          "name": "GoodFlag",
+          "enabledFor": [{ "type": "always" }]
+        }, {
+          "name": "JunkFlag",
+          "enabledFor": ["not-an-object"]
+        }]
+      )
+
+      features = nil
+      expect { features = marshaller.unmarshall(json) }.not_to raise_error
+
+      expect(features.size).to be 2
+      expect(features.find { |f| f.name == 'GoodFlag' }.enabled?).to be true
+
+      junk = features.find { |f| f.name == 'JunkFlag' }
+      expect(junk.un_evaluable?).to be true
+      expect(junk.enabled?).to be false
+    end
   end
 end
