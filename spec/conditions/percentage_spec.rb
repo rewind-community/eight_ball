@@ -37,6 +37,15 @@ RSpec.describe EightBall::Conditions::Percentage do
     it 'should expose the percentage' do
       expect(EightBall::Conditions::Percentage.new(percentage: 25).percentage).to eq 25
     end
+
+    it 'should accept an integral Float percentage' do
+      expect(EightBall::Conditions::Percentage.new(percentage: 50.0).percentage).to eq 50
+    end
+
+    it 'should reject a non-integral Float percentage' do
+      expect { EightBall::Conditions::Percentage.new(percentage: 50.5) }
+        .to raise_error ArgumentError, 'percentage must be an integer between 0 and 100'
+    end
   end
 
   describe 'satisfied?' do

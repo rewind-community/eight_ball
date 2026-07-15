@@ -170,6 +170,12 @@ RSpec.describe EightBall::Feature do
       feature = EightBall::Feature.new 'WithMeta', [], [], metadata: meta
       expect(feature.enabled?).to be true
     end
+
+    it 'should distinguish two features that differ only in metadata' do
+      a = EightBall::Feature.new('Same', [EightBall::Conditions::Always.new], [], metadata: { 'type' => 'experiment' })
+      b = EightBall::Feature.new('Same', [EightBall::Conditions::Always.new], [], metadata: { 'type' => 'ops' })
+      expect(a == b).to be false
+    end
   end
 
   describe 'un_evaluable!' do

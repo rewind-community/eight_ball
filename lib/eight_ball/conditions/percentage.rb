@@ -21,6 +21,7 @@ module EightBall::Conditions
       raise ArgumentError, 'Missing value for percentage' if options[:percentage].nil?
 
       percentage = options[:percentage]
+      percentage = percentage.to_i if percentage.is_a?(Float) && percentage.to_i == percentage
       unless percentage.is_a?(Integer) && percentage >= 0 && percentage <= 100
         raise ArgumentError, 'percentage must be an integer between 0 and 100'
       end

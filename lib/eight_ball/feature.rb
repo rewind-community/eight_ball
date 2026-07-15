@@ -73,7 +73,8 @@ module EightBall
         enabled_for.size == other.enabled_for.size &&
         enabled_for.all? { |condition| other.enabled_for.any? { |other_condition| condition == other_condition } } &&
         disabled_for.size == other.disabled_for.size &&
-        disabled_for.all? { |condition| other.disabled_for.any? { |other_condition| condition == other_condition } }
+        disabled_for.all? { |condition| other.disabled_for.any? { |other_condition| condition == other_condition } } &&
+        metadata == other.metadata
     end
     alias eql? ==
 

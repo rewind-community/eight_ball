@@ -343,5 +343,30 @@ RSpec.describe EightBall::Marshallers::Json do
       expect(features.map(&:name)).to eq ['Good']
       expect(features.first.enabled?).to be true
     end
+
+    it 'should fail a flag closed when a condition list is present but not an array' do
+      json = %(
+        [{ "name": "Good", "enabledFor": [{ "type": "always" }] },
+         { "name": "BadEnabledList", "enabledFor": { "type": "always" } },
+         { "name": "BadDisabledList", "disabledFor": "nope" }]
+      )
+
+      features = nil
+      expect { features = marshaller.unmarshall(json) }.not_to raise_error
+
+      expect(features.find { |f| f.name == 'Good' }.enabled?).to be true
+      expect(features.find { |f| f.name == 'BadEnabledList' }.enabled?).to be false
+      expect(features.find { |f| f.name == 'BadDisabledList' }.enabled?).to be false
+    end
+
+    it 'should fail a flag closed when a condition constructor raises a non-ArgumentError' do
+      # array bounds hit [2] < [1] -> NoMethodError inside Range#initialize
+      json = %([{ "name": "BadRange", "enabledFor": [{ "type": "range", "min": [1], "max": [2] }] }])
+
+      features = nil
+      expect { features = marshaller.unmarshall(json) }.not_to raise_error
+      expect(features.first.un_evaluable?).to be true
+      expect(features.first.enabled?).to be false
+    end
   end
 end

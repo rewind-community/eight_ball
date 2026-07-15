@@ -70,7 +70,7 @@ module EightBall::Marshallers
         build_feature feature
       end
     rescue JSON::ParserError => e
-      EightBall.logger.error { "Failed to parse JSON: #{e.message}" }
+      EightBall.logger.error { "Failed to parse JSON: #{e.message.inspect}" }
       []
     end
 
@@ -108,7 +108,8 @@ module EightBall::Marshallers
     end
 
     def create_conditions_from_json(json_conditions)
-      return [] unless json_conditions.is_a?(Array)
+      return [] if json_conditions.nil?
+      return [EightBall::Conditions::Opaque.new(json_conditions)] unless json_conditions.is_a?(Array)
 
       json_conditions.map { |condition| build_condition condition }
     end
@@ -123,7 +124,7 @@ module EightBall::Marshallers
       return EightBall::Conditions::Opaque.new(condition) if condition_class.nil?
 
       condition_class.new condition
-    rescue ArgumentError
+    rescue StandardError
       EightBall::Conditions::Opaque.new(condition)
     end
   end
