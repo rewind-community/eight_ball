@@ -62,11 +62,11 @@ module EightBall::Marshallers
     #   marshaller = EightBall::Marshallers::Json.new
     #   marshaller.unmarshall json_string => [Features]
     def unmarshall(json)
-      parsed = JSON.parse(json, symbolize_names: true).to_snake_keys
+      parsed = JSON.parse(json, symbolize_names: true)
 
       raise ArgumentError, 'JSON input was not an array' unless parsed.is_a? Array
 
-      parsed.filter_map do |feature|
+      parsed.to_snake_keys.filter_map do |feature|
         build_feature feature
       end
     rescue JSON::ParserError => e
