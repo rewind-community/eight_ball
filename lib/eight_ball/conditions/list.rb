@@ -32,6 +32,10 @@ module EightBall::Conditions
       values.include? value
     end
 
+    def wire_fields
+      %i[values parameter]
+    end
+
     protected
 
     def state

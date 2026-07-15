@@ -46,6 +46,10 @@ module EightBall::Conditions
       bucket < @percentage
     end
 
+    def wire_fields
+      %i[percentage parameter]
+    end
+
     protected
 
     # flag_name is a runtime injection, excluded from equality and the wire form.

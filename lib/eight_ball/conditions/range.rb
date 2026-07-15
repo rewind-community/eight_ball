@@ -45,6 +45,10 @@ module EightBall::Conditions
       value >= min && value <= max
     end
 
+    def wire_fields
+      %i[min max parameter]
+    end
+
     protected
 
     def state

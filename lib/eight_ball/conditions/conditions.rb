@@ -5,6 +5,8 @@ module EightBall::Conditions
   # @param [String] name The case insensitive name to find the Condition for
   # @return [EightBall::Conditions] the Condition class represented by the given name
   def self.by_name(name)
+    return nil unless name.is_a?(String)
+
     mappings = {
       always: EightBall::Conditions::Always,
       list: EightBall::Conditions::List,

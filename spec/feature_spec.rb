@@ -200,9 +200,20 @@ RSpec.describe EightBall::Feature do
   describe 'percentage condition integration' do
     it 'should inject the flag name as the bucket salt at construction' do
       condition = EightBall::Conditions::Percentage.new percentage: 50, parameter: 'account_id'
-      EightBall::Feature.new 'SaltedFlag', [condition]
+      feature = EightBall::Feature.new 'SaltedFlag', [condition]
 
-      expect(condition.flag_name).to eq 'SaltedFlag'
+      expect(feature.enabled_for.first.flag_name).to eq 'SaltedFlag'
+      expect(condition.flag_name).to be_nil
+    end
+
+    it 'should not re-salt a condition shared across features (duped on inject)' do
+      shared = EightBall::Conditions::Percentage.new percentage: 50, parameter: 'account_id'
+      f1 = EightBall::Feature.new 'FlagOne', [shared]
+      f2 = EightBall::Feature.new 'FlagTwo', [shared]
+
+      expect(f1.enabled_for.first.flag_name).to eq 'FlagOne'
+      expect(f2.enabled_for.first.flag_name).to eq 'FlagTwo'
+      expect(shared.flag_name).to be_nil
     end
 
     it 'should evaluate a percentage condition end-to-end without raising' do

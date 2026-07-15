@@ -37,11 +37,6 @@ require 'plissken'
 #   }]
 module EightBall::Marshallers
   class Json
-    # Raised when a condition cannot be built; caught per-feature to fail that
-    # single flag closed (OFF).
-    UnknownConditionType = Class.new(StandardError)
-    private_constant :UnknownConditionType
-
     # Convert the given {EightBall::Feature Features} into a JSON array.
     #
     # @param [Array<EightBall::Feature>] features The {EightBall::Feature Features} to convert.
@@ -71,7 +66,7 @@ module EightBall::Marshallers
 
       raise ArgumentError, 'JSON input was not an array' unless parsed.is_a? Array
 
-      parsed.map do |feature|
+      parsed.filter_map do |feature|
         build_feature feature
       end
     rescue JSON::ParserError => e
@@ -82,67 +77,54 @@ module EightBall::Marshallers
     private
 
     def build_feature(feature)
+      unless feature.is_a?(Hash)
+        EightBall.logger.warn { "Skipping non-object feature entry: #{feature.inspect}" }
+        return nil
+      end
+
       enabled_for = create_conditions_from_json feature[:enabled_for]
       disabled_for = create_conditions_from_json feature[:disabled_for]
+      built = EightBall::Feature.new feature[:name], enabled_for, disabled_for, metadata: feature[:metadata]
 
-      EightBall::Feature.new feature[:name], enabled_for, disabled_for, metadata: feature[:metadata]
-    rescue UnknownConditionType, ArgumentError => e
-      EightBall.logger.warn { "Feature '#{feature[:name]}' has an invalid condition (#{e.message}); marking it un-evaluable (OFF)" }
-      # Keep the raw source so re-marshalling re-emits the flag unchanged.
-      EightBall::Feature.new(feature[:name], [], [], metadata: feature[:metadata]).tap { |f| f.un_evaluable! feature }
+      unparseable = (enabled_for + disabled_for).select { |condition| condition.is_a?(EightBall::Conditions::Opaque) }
+      unless unparseable.empty?
+        EightBall.logger.warn { "Feature #{feature[:name].inspect} has unparseable condition(s) #{unparseable.map(&:raw).inspect}; marking it un-evaluable (OFF)" }
+        built.un_evaluable!
+      end
+
+      built
     end
 
     def feature_to_hash(feature)
-      # Un-evaluable features re-emit their raw source unchanged.
-      return feature.source if feature.un_evaluable? && feature.source
-
       hash = {
         name: feature.name
       }
 
-      hash[:enabled_for] = feature.enabled_for.map { |condition| condition_to_hash(condition) } unless feature.enabled_for.empty?
-      hash[:disabled_for] = feature.disabled_for.map { |condition| condition_to_hash(condition) } unless feature.disabled_for.empty?
+      hash[:enabled_for] = feature.enabled_for.map(&:to_wire) unless feature.enabled_for.empty?
+      hash[:disabled_for] = feature.disabled_for.map(&:to_wire) unless feature.disabled_for.empty?
       hash[:metadata] = feature.metadata unless feature.metadata.nil?
 
       hash
     end
 
-    # Wire fields each condition type serializes, in output order. Anything not
-    # listed (e.g. percentage's runtime flag_name salt) is never persisted.
-    CONDITION_WIRE_FIELDS = {
-      'always' => [],
-      'never' => [],
-      'list' => %i[values parameter],
-      'range' => %i[min max parameter],
-      'percentage' => %i[percentage parameter]
-    }.freeze
-    private_constant :CONDITION_WIRE_FIELDS
+    def create_conditions_from_json(json_conditions)
+      return [] unless json_conditions.is_a?(Array)
 
-    def condition_to_hash(condition)
-      type = condition.class.name.split('::').last.downcase
-      hash = { type: type }
-
-      CONDITION_WIRE_FIELDS.fetch(type, []).each do |field|
-        value = condition.public_send(field)
-        next if value.nil?
-
-        hash[field.to_s] = value
-      end
-
-      hash
+      json_conditions.map { |condition| build_condition condition }
     end
 
-    def create_conditions_from_json(json_conditions)
-      return [] unless json_conditions&.is_a?(Array)
+    # Build one condition, or wrap anything unbuildable (non-object, unknown type,
+    # invalid params) in an Opaque condition so a single bad entry fails only its
+    # flag closed instead of aborting the whole parse.
+    def build_condition(condition)
+      return EightBall::Conditions::Opaque.new(condition) unless condition.is_a?(Hash)
 
-      json_conditions.map do |condition|
-        raise UnknownConditionType, "not a condition object: #{condition.class}" unless condition.is_a?(Hash)
+      condition_class = EightBall::Conditions.by_name condition[:type]
+      return EightBall::Conditions::Opaque.new(condition) if condition_class.nil?
 
-        condition_class = EightBall::Conditions.by_name condition[:type]
-        raise UnknownConditionType, condition[:type].to_s if condition_class.nil?
-
-        condition_class.new condition
-      end
+      condition_class.new condition
+    rescue ArgumentError
+      EightBall::Conditions::Opaque.new(condition)
     end
   end
 end

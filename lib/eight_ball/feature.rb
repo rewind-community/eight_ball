@@ -4,7 +4,7 @@ module EightBall
   # A Feature is an element of your application that can be enabled or disabled
   # based on various {EightBall::Conditions}.
   class Feature
-    attr_reader :name, :enabled_for, :disabled_for, :metadata, :source
+    attr_reader :name, :enabled_for, :disabled_for, :metadata
 
     # Creates a new instance of an Interval RefreshPolicy.
     #
@@ -24,7 +24,6 @@ module EightBall
       @disabled_for = Array disabled_for
       @metadata = metadata
       @un_evaluable = false
-      @source = nil
 
       inject_flag_name @enabled_for
       inject_flag_name @disabled_for
@@ -61,12 +60,9 @@ module EightBall
     # Marks this Feature un-evaluable: {enabled?} always returns +false+ and its
     # Conditions are never inspected. Used by Marshallers to fail a bad flag closed.
     #
-    # @param source [Hash, nil] the raw unmarshalled feature hash, kept so a
-    #   Marshaller can re-emit the flag unchanged.
     # @return [nil]
-    def un_evaluable!(source = nil)
+    def un_evaluable!
       @un_evaluable = true
-      @source = source
       nil
     end
 
@@ -97,11 +93,14 @@ module EightBall
       end
     end
 
-    # Percentage conditions bucket on a salt of the flag name; give any condition
-    # that accepts it the owning name. Others are untouched.
+    # Percentage conditions bucket on a salt of the flag name. Give any condition
+    # that accepts it the owning name, duping first so a condition shared across
+    # Features is not re-salted in place. Others pass through untouched.
     def inject_flag_name(conditions)
-      conditions.each do |condition|
-        condition.flag_name = @name if condition.respond_to?(:flag_name=)
+      conditions.map! do |condition|
+        next condition unless condition.respond_to?(:flag_name=)
+
+        condition.dup.tap { |copy| copy.flag_name = @name }
       end
     end
   end

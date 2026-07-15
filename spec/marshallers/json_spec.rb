@@ -315,5 +315,33 @@ RSpec.describe EightBall::Marshallers::Json do
       expect(junk.un_evaluable?).to be true
       expect(junk.enabled?).to be false
     end
+
+    it 'should fail a flag closed on a condition with a missing or non-string type, not raise' do
+      json = %(
+        [{ "name": "Good", "enabledFor": [{ "type": "always" }] },
+         { "name": "NonStringType", "enabledFor": [{ "type": 5 }] },
+         { "name": "MissingType", "enabledFor": [{ "parameter": "account_id" }] }]
+      )
+
+      features = nil
+      expect { features = marshaller.unmarshall(json) }.not_to raise_error
+
+      expect(features.size).to be 3
+      expect(features.find { |f| f.name == 'Good' }.enabled?).to be true
+      expect(features.find { |f| f.name == 'NonStringType' }.enabled?).to be false
+      expect(features.find { |f| f.name == 'MissingType' }.enabled?).to be false
+    end
+
+    it 'should skip non-object top-level entries without dropping the healthy flags' do
+      json = %(
+        [{ "name": "Good", "enabledFor": [{ "type": "always" }] }, null, 5, "junk"]
+      )
+
+      features = nil
+      expect { features = marshaller.unmarshall(json) }.not_to raise_error
+
+      expect(features.map(&:name)).to eq ['Good']
+      expect(features.first.enabled?).to be true
+    end
   end
 end

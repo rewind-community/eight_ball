@@ -100,7 +100,7 @@ The salt is the **flag name**, so the same `account_id` lands in independent buc
 
 ### Metadata
 
-A Feature may carry an optional, eval-agnostic `metadata` object (`type`, `owner`, `expires_at`, all optional strings). It is preserved through marshall/unmarshall and ignored during evaluation.
+A Feature may carry an optional, eval-agnostic `metadata` object (`type`, `owner`, `expires_at`, all optional strings). It is preserved through marshall/unmarshall and ignored during evaluation. Its keys go through the same case conversion as the rest of the wire format (e.g. `expires_at` serializes as `expiresAt`) and come back symbol-keyed after unmarshall.
 
 ### Provider
 
