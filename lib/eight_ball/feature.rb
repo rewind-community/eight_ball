@@ -20,13 +20,10 @@ module EightBall
     #   feature = EightBall::Feature.new 'feature1', EightBall::Conditions::Always
     def initialize(name, enabled_for = [], disabled_for = [], metadata: nil)
       @name = name
-      @enabled_for = Array enabled_for
-      @disabled_for = Array disabled_for
+      @enabled_for = inject_flag_name(Array(enabled_for))
+      @disabled_for = inject_flag_name(Array(disabled_for))
       @metadata = metadata
       @un_evaluable = false
-
-      inject_flag_name @enabled_for
-      inject_flag_name @disabled_for
     end
 
     # "EightBall, is this Feature enabled?"
@@ -97,7 +94,7 @@ module EightBall
     # that accepts it the owning name, duping first so a condition shared across
     # Features is not re-salted in place. Others pass through untouched.
     def inject_flag_name(conditions)
-      conditions.map! do |condition|
+      conditions.map do |condition|
         next condition unless condition.respond_to?(:flag_name=)
 
         condition.dup.tap { |copy| copy.flag_name = @name }

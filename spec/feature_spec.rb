@@ -216,6 +216,20 @@ RSpec.describe EightBall::Feature do
       expect(shared.flag_name).to be_nil
     end
 
+    it 'does not require the conditions array to be unfrozen' do
+      conditions = [EightBall::Conditions::Always.new].freeze
+      expect { EightBall::Feature.new('Frozen', conditions) }.not_to raise_error
+    end
+
+    it 'does not mutate the caller conditions array' do
+      pct = EightBall::Conditions::Percentage.new percentage: 50, parameter: 'account_id'
+      arr = [pct]
+      EightBall::Feature.new 'X', arr
+
+      expect(arr.first).to be pct
+      expect(arr.first.flag_name).to be_nil
+    end
+
     it 'should evaluate a percentage condition end-to-end without raising' do
       condition = EightBall::Conditions::Percentage.new percentage: 100, parameter: 'account_id'
       feature = EightBall::Feature.new 'Exp', [condition]
