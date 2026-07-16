@@ -21,6 +21,23 @@ module EightBall::Conditions
       state.hash
     end
 
+    # The wire-format hash for this condition. Subclasses declare their fields via
+    # {wire_fields}; the type is the lower-cased class name, which must match a
+    # {EightBall::Conditions.by_name} key so the condition round-trips.
+    def to_wire
+      wire = { type: self.class.name.split('::').last.downcase }
+      wire_fields.each do |field|
+        value = public_send(field)
+        wire[field.to_s] = value unless value.nil?
+      end
+      wire
+    end
+
+    # The attributes this condition serializes, in output order (default: none).
+    def wire_fields
+      []
+    end
+
     protected
 
     def state

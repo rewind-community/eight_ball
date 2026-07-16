@@ -62,54 +62,75 @@ module EightBall::Marshallers
     #   marshaller = EightBall::Marshallers::Json.new
     #   marshaller.unmarshall json_string => [Features]
     def unmarshall(json)
-      parsed = JSON.parse(json, symbolize_names: true).to_snake_keys
+      parsed = JSON.parse(json, symbolize_names: true)
 
       raise ArgumentError, 'JSON input was not an array' unless parsed.is_a? Array
 
-      parsed.map do |feature|
-        enabled_for = create_conditions_from_json feature[:enabled_for]
-        disabled_for = create_conditions_from_json feature[:disabled_for]
-
-        EightBall::Feature.new feature[:name], enabled_for, disabled_for
+      parsed.to_snake_keys.filter_map do |feature|
+        build_feature feature
       end
     rescue JSON::ParserError => e
-      EightBall.logger.error { "Failed to parse JSON: #{e.message}" }
+      EightBall.logger.error { "Failed to parse JSON: #{e.message.inspect}" }
       []
     end
 
     private
+
+    def build_feature(feature)
+      unless feature.is_a?(Hash)
+        EightBall.logger.warn { "Skipping non-object feature entry: #{feature.inspect}" }
+        return nil
+      end
+
+      enabled_for = create_conditions_from_json feature[:enabled_for]
+      disabled_for = create_conditions_from_json feature[:disabled_for]
+      built = EightBall::Feature.new feature[:name], enabled_for, disabled_for, metadata: feature[:metadata]
+
+      unparseable = (enabled_for + disabled_for).select { |condition| condition.is_a?(EightBall::Conditions::Opaque) }
+
+      # A nameless flag can't be looked up, and its flag-name-salted conditions raise at eval; fail it closed.
+      if feature[:name].nil?
+        EightBall.logger.warn { 'Feature entry has no name; marking it un-evaluable (OFF)' }
+        built.un_evaluable!
+      elsif !unparseable.empty?
+        EightBall.logger.warn { "Feature #{feature[:name].inspect} has unparseable condition(s) #{unparseable.map(&:raw).inspect}; marking it un-evaluable (OFF)" }
+        built.un_evaluable!
+      end
+
+      built
+    end
 
     def feature_to_hash(feature)
       hash = {
         name: feature.name
       }
 
-      hash[:enabled_for] = feature.enabled_for.map { |condition| condition_to_hash(condition) } unless feature.enabled_for.empty?
-      hash[:disabled_for] = feature.disabled_for.map { |condition| condition_to_hash(condition) } unless feature.disabled_for.empty?
-
-      hash
-    end
-
-    def condition_to_hash(condition)
-      hash = {
-        type: condition.class.name.split('::').last.downcase
-      }
-      condition.instance_variables.each do |var|
-        next unless condition.instance_variable_get(var)
-
-        hash[var.to_s.delete('@')] = condition.instance_variable_get(var)
-      end
+      hash[:enabled_for] = feature.enabled_for.map(&:to_wire) unless feature.enabled_for.empty?
+      hash[:disabled_for] = feature.disabled_for.map(&:to_wire) unless feature.disabled_for.empty?
+      hash[:metadata] = feature.metadata unless feature.metadata.nil?
 
       hash
     end
 
     def create_conditions_from_json(json_conditions)
-      return [] unless json_conditions&.is_a?(Array)
+      return [] if json_conditions.nil?
+      return [EightBall::Conditions::Opaque.new(json_conditions)] unless json_conditions.is_a?(Array)
 
-      json_conditions.map do |condition|
-        condition_class = EightBall::Conditions.by_name condition[:type]
-        condition_class.new condition
-      end
+      json_conditions.map { |condition| build_condition condition }
+    end
+
+    # Build one condition, or wrap anything unbuildable (non-object, unknown type,
+    # invalid params) in an Opaque condition so a single bad entry fails only its
+    # flag closed instead of aborting the whole parse.
+    def build_condition(condition)
+      return EightBall::Conditions::Opaque.new(condition) unless condition.is_a?(Hash)
+
+      condition_class = EightBall::Conditions.by_name condition[:type]
+      return EightBall::Conditions::Opaque.new(condition) if condition_class.nil?
+
+      condition_class.new condition
+    rescue StandardError
+      EightBall::Conditions::Opaque.new(condition)
     end
   end
 end

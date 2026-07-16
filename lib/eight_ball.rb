@@ -11,6 +11,8 @@ require 'eight_ball/conditions/base'
 require 'eight_ball/conditions/always'
 require 'eight_ball/conditions/list'
 require 'eight_ball/conditions/never'
+require 'eight_ball/conditions/opaque'
+require 'eight_ball/conditions/percentage'
 require 'eight_ball/conditions/range'
 
 require 'eight_ball/marshallers/json'

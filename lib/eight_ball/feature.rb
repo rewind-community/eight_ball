@@ -4,7 +4,7 @@ module EightBall
   # A Feature is an element of your application that can be enabled or disabled
   # based on various {EightBall::Conditions}.
   class Feature
-    attr_reader :name, :enabled_for, :disabled_for
+    attr_reader :name, :enabled_for, :disabled_for, :metadata
 
     # Creates a new instance of an Interval RefreshPolicy.
     #
@@ -13,13 +13,17 @@ module EightBall
     #   The Condition(s) that need to be satisfied for the Feature to be enabled.
     # @param disabled_for [Array<EightBall::Conditions>, EightBall::Conditions]
     #   The Condition(s) that need to be satisfied for the Feature to be disabled.
+    # @param metadata [Hash, nil] Optional eval-agnostic metadata
+    #   (e.g. { "type" => ..., "owner" => ..., "expires_at" => ... }).
     #
     # @example A Feature which is always enabled
     #   feature = EightBall::Feature.new 'feature1', EightBall::Conditions::Always
-    def initialize(name, enabled_for = [], disabled_for = [])
+    def initialize(name, enabled_for = [], disabled_for = [], metadata: nil)
       @name = name
-      @enabled_for = Array enabled_for
-      @disabled_for = Array disabled_for
+      @enabled_for = inject_flag_name(Array(enabled_for))
+      @disabled_for = inject_flag_name(Array(disabled_for))
+      @metadata = metadata
+      @un_evaluable = false
     end
 
     # "EightBall, is this Feature enabled?"
@@ -42,10 +46,26 @@ module EightBall
     # @example The Feature's {EightBall::Conditions} require an account ID
     #   feature.enabled? account_id: 123
     def enabled?(parameters = {})
+      return false if @un_evaluable
+
       return true if @enabled_for.empty? && @disabled_for.empty?
       return true if @enabled_for.empty? && !any_satisfied?(@disabled_for, parameters)
 
       any_satisfied?(@enabled_for, parameters) && !any_satisfied?(@disabled_for, parameters)
+    end
+
+    # Marks this Feature un-evaluable: {enabled?} always returns +false+ and its
+    # Conditions are never inspected. Used by Marshallers to fail a bad flag closed.
+    #
+    # @return [nil]
+    def un_evaluable!
+      @un_evaluable = true
+      nil
+    end
+
+    # @return [Boolean] whether this Feature has been marked un-evaluable.
+    def un_evaluable?
+      @un_evaluable
     end
 
     def ==(other)
@@ -53,7 +73,8 @@ module EightBall
         enabled_for.size == other.enabled_for.size &&
         enabled_for.all? { |condition| other.enabled_for.any? { |other_condition| condition == other_condition } } &&
         disabled_for.size == other.disabled_for.size &&
-        disabled_for.all? { |condition| other.disabled_for.any? { |other_condition| condition == other_condition } }
+        disabled_for.all? { |condition| other.disabled_for.any? { |other_condition| condition == other_condition } } &&
+        metadata == other.metadata
     end
     alias eql? ==
 
@@ -67,6 +88,17 @@ module EightBall
         raise ArgumentError, "Missing parameter #{condition.parameter}" if value.nil?
 
         condition.satisfied? value
+      end
+    end
+
+    # Percentage conditions bucket on a salt of the flag name. Give any condition
+    # that accepts it the owning name, duping first so a condition shared across
+    # Features is not re-salted in place. Others pass through untouched.
+    def inject_flag_name(conditions)
+      conditions.map do |condition|
+        next condition unless condition.respond_to?(:flag_name=)
+
+        condition.dup.tap { |copy| copy.flag_name = @name }
       end
     end
   end
