@@ -1,7 +1,8 @@
 # Changelog
 
-## [3.3.0]
+## [3.3.1]
 
+- Fix the `tag-and-release` workflow: grant the release job `contents: write` so tag and GitHub Release creation succeed. The repository's default GitHub Actions token permission had been changed to read-only, which broke the release step with `Resource not accessible by integration`.
 - Add `percentage` condition for sticky A/B bucketing. Canonical algorithm: `bucket = Integer(SHA256("<flagName>:<value>")[0,8], 16) % 100`, satisfied iff `bucket < percentage`; salted by flag name; buckets on a caller-supplied parameter.
 - Harden JSON unmarshalling: a flag containing an unknown or malformed condition (unknown `type`, or a known type with invalid params) now evaluates to `false` (OFF) and logs a warning, instead of raising and blacking out the entire feature set. Other flags in the blob are unaffected.
 - Add optional top-level `metadata` (`type`, `owner`, `expires_at`) to `Feature`, preserved through marshall/unmarshall and ignored during evaluation.
