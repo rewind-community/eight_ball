@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    eight_ball (3.3.1)
+    eight_ball (3.3.2)
       awrence (~> 1.1)
       logger (~> 1.7)
       plissken (~> 1.2)

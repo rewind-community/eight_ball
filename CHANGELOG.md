@@ -1,5 +1,9 @@
 # Changelog
 
+## [3.3.2]
+
+- Fix the `tag-and-release` workflow to create the release tag with the `rewind-community-tagger` GitHub App token (`TAGGER_APP_ID`/`TAGGER_PRIVATE_KEY`) instead of the default `GITHUB_TOKEN`, which the organization `rewind-tag` ruleset does not permit to create `v*` tags (the previous release failed with `Reference update failed`).
+
 ## [3.3.1]
 
 - Fix the `tag-and-release` workflow: grant the release job `contents: write` so tag and GitHub Release creation succeed. The repository's default GitHub Actions token permission had been changed to read-only, which broke the release step with `Resource not accessible by integration`.
