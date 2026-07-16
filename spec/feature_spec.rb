@@ -258,5 +258,15 @@ RSpec.describe EightBall::Feature do
       expect { EightBall::Feature.new 'Legacy', [list] }.not_to raise_error
       expect(list).not_to respond_to(:flag_name)
     end
+
+    it 'should inject the flag name into disabled_for conditions too' do
+      condition = EightBall::Conditions::Percentage.new percentage: 100, parameter: 'account_id'
+      feature = EightBall::Feature.new 'DisabledPct', [], [condition]
+
+      expect(feature.disabled_for.first.flag_name).to eq 'DisabledPct'
+      # percentage 100 in disabled_for => always disabled; must evaluate without
+      # raising, proving the salt is injected on the disabled_for path too.
+      expect(feature.enabled?(account_id: 'acct-1')).to be false
+    end
   end
 end

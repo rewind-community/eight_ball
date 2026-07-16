@@ -87,7 +87,12 @@ module EightBall::Marshallers
       built = EightBall::Feature.new feature[:name], enabled_for, disabled_for, metadata: feature[:metadata]
 
       unparseable = (enabled_for + disabled_for).select { |condition| condition.is_a?(EightBall::Conditions::Opaque) }
-      unless unparseable.empty?
+
+      # A nameless flag can't be looked up, and its flag-name-salted conditions raise at eval; fail it closed.
+      if feature[:name].nil?
+        EightBall.logger.warn { 'Feature entry has no name; marking it un-evaluable (OFF)' }
+        built.un_evaluable!
+      elsif !unparseable.empty?
         EightBall.logger.warn { "Feature #{feature[:name].inspect} has unparseable condition(s) #{unparseable.map(&:raw).inspect}; marking it un-evaluable (OFF)" }
         built.un_evaluable!
       end

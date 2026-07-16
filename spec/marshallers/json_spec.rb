@@ -368,5 +368,30 @@ RSpec.describe EightBall::Marshallers::Json do
       expect(features.first.un_evaluable?).to be true
       expect(features.first.enabled?).to be false
     end
+
+    it 'should fail a nameless flag closed instead of raising at eval' do
+      # No name means a nil salt is injected into the percentage condition, which would
+      # raise at eval; it must fail closed like any other unparseable flag.
+      json = %([{ "enabledFor": [{ "type": "percentage", "parameter": "accountId", "percentage": 100 }] }])
+
+      features = marshaller.unmarshall(json)
+
+      expect(features.size).to be 1
+      expect(features.first.un_evaluable?).to be true
+      expect { features.first.enabled?(account_id: 'acct-1') }.not_to raise_error
+      expect(features.first.enabled?(account_id: 'acct-1')).to be false
+    end
+
+    it 'should inject flag_name for a percentage condition in disabledFor' do
+      json = %([{ "name": "DisabledPct", "disabledFor": [{ "type": "percentage", "parameter": "accountId", "percentage": 100 }] }])
+
+      features = marshaller.unmarshall(json)
+      condition = features[0].disabled_for[0]
+
+      expect(condition).to be_a EightBall::Conditions::Percentage
+      expect(condition.flag_name).to eq 'DisabledPct'
+      # Must evaluate without raising: the salt is injected through the marshaller path.
+      expect(features[0].enabled?(account_id: 'acct-1')).to be false
+    end
   end
 end
