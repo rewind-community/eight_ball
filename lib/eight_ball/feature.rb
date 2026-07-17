@@ -37,8 +37,9 @@ module EightBall
     #   and NONE of the {disabled_for} {EightBall::Conditions} are satisfied.
     # @return [false ] if ANY of the {disabled_for} {EightBall::Conditions} are satisfied
     #
-    # @raise [ArgumentError] if no value is provided for a parameter required
-    #   by one of the Feature's {EightBall::Conditions}
+    # @raise [ArgumentError] if +parameters+ is empty and one of the Feature's
+    #   {EightBall::Conditions} requires a parameter. A condition whose parameter
+    #   is simply absent from a non-empty +parameters+ is treated as unsatisfied.
     #
     # @example The Feature's {EightBall::Conditions} do not require any parameters
     #   feature.enabled?
@@ -85,7 +86,14 @@ module EightBall
         return condition.satisfied? if condition.parameter.nil?
 
         value = parameters[condition.parameter.to_sym]
-        raise ArgumentError, "Missing parameter #{condition.parameter}" if value.nil?
+        if value.nil?
+          # A caller that supplies some parameters but not this one leaves the
+          # condition unsatisfied; a caller that supplies none at all is a
+          # usage error.
+          raise ArgumentError, 'At least one parameter is required' if parameters.empty?
+
+          next false
+        end
 
         condition.satisfied? value
       end

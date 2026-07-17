@@ -61,11 +61,50 @@ RSpec.describe EightBall::Feature do
       expect(feature.enabled?).to be false
     end
 
-    it 'should raise an Exception if a parameter is missing' do
+    it 'should raise an Exception if evaluated with no parameters at all' do
       condition = EightBall::Conditions::List.new parameter: 'param1', values: [1, 2]
       feature = EightBall::Feature.new 'Feature', condition
 
-      expect { feature.enabled? }.to raise_error ArgumentError, 'Missing parameter param1'
+      expect { feature.enabled? }.to raise_error ArgumentError, 'At least one parameter is required'
+    end
+
+    it 'should treat a condition as unsatisfied if its parameter is absent from a non-empty bag' do
+      condition = EightBall::Conditions::List.new parameter: 'param1', values: [1, 2]
+      feature = EightBall::Feature.new 'Feature', condition
+
+      expect(feature.enabled?(other_param: 1)).to be false
+    end
+
+    it 'should not raise when one of several enabledFor conditions is missing its parameter' do
+      matching = EightBall::Conditions::List.new parameter: 'plan', values: %w[pro enterprise]
+      other = EightBall::Conditions::List.new parameter: 'account_id', values: [1, 2]
+
+      feature = EightBall::Feature.new 'Feature', [matching, other]
+
+      expect(feature.enabled?(plan: 'pro')).to be true
+      expect(feature.enabled?(plan: 'free')).to be false
+    end
+
+    it 'should short-circuit before reaching a later condition with an unsupplied parameter' do
+      satisfied = EightBall::Conditions::Always.new
+      later = EightBall::Conditions::List.new parameter: 'account_id', values: [1, 2]
+
+      feature = EightBall::Feature.new 'Feature', [satisfied, later]
+
+      expect(feature.enabled?).to be true
+    end
+
+    it 'should not raise for a bare feature evaluated with an empty parameters hash' do
+      feature = EightBall::Feature.new 'NoConditions'
+
+      expect(feature.enabled?({})).to be true
+    end
+
+    it 'should not disable when a disabledFor condition parameter is absent from a non-empty bag' do
+      disabled_on_missing = EightBall::Conditions::List.new parameter: 'account_id', values: [1, 2]
+      feature = EightBall::Feature.new 'Feature', [], [disabled_on_missing]
+
+      expect(feature.enabled?(other_param: 1)).to be true
     end
 
     it 'should pass parameter to satisfied?' do
