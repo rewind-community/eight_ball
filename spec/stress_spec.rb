@@ -294,12 +294,13 @@ RSpec.describe 'eight_ball stress and integration' do
       expect { marshaller.unmarshall('{"a":1}') }.to raise_error(ArgumentError, /not an array/)
     end
 
-    it 'raises a clear error when a required parameter is absent (documented contract)' do
+    it 'treats a required parameter absent from a non-empty bag as unsatisfied, but raises on an empty bag (documented contract)' do
       features = marshaller.unmarshall(
         JSON.generate([{ name: 'NeedsAccount', enabledFor: [{ type: 'list', parameter: 'account_id', values: %w[acct-1] }] }])
       )
-      expect { features.first.enabled?(region_name: 'region-1') }
-        .to raise_error(ArgumentError, /Missing parameter account_id/)
+      expect(features.first.enabled?(region_name: 'region-1')).to be false
+      expect { features.first.enabled?({}) }
+        .to raise_error(ArgumentError, /At least one parameter is required/)
     end
   end
 end

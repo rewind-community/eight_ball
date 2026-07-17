@@ -96,7 +96,7 @@ The salt is the **flag name**, so the same `account_id` lands in independent buc
 
 **Re-randomizing requires a rename.** Because the salt is the flag name, an experiment cannot be re-randomized on the same flag. The salt is stable for the life of the name (this is what decorrelates a subject across flags), so a subject's bucket for a given flag is fixed forever. Changing `percentage` only moves the threshold (it does not reshuffle buckets); to draw fresh buckets, rename the flag.
 
-**Requires the bucketing parameter.** Like every parameterized condition, `percentage` requires its bucketing value (the `parameter` it was configured with) in the evaluation bag. If it is absent, evaluation raises `ArgumentError`; supply it or rescue.
+**Requires the bucketing parameter.** Like every parameterized condition, `percentage` is concerned with its bucketing value (the `parameter` it was configured with). If a non-empty evaluation bag omits it, the condition is simply treated as unsatisfied; evaluating with no parameters at all raises `ArgumentError`.
 
 ### Metadata
 
