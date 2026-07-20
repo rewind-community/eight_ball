@@ -1,5 +1,10 @@
 # Changelog
 
+## [3.3.3]
+
+- Add `.compact` before each `.map(&:to_wire)` so stray nil conditions are
+dropped instead of blowing up serialization
+
 ## [3.3.2]
 
 - Fix the `tag-and-release` workflow to create the release tag with the `rewind-community-tagger` GitHub App token (`TAGGER_APP_ID`/`TAGGER_PRIVATE_KEY`) instead of the default `GITHUB_TOKEN`, which the organization `rewind-tag` ruleset does not permit to create `v*` tags (the previous release failed with `Reference update failed`).

@@ -105,8 +105,11 @@ module EightBall::Marshallers
         name: feature.name
       }
 
-      hash[:enabled_for] = feature.enabled_for.map(&:to_wire) unless feature.enabled_for.empty?
-      hash[:disabled_for] = feature.disabled_for.map(&:to_wire) unless feature.disabled_for.empty?
+      enabled_for = feature.enabled_for.compact
+      hash[:enabled_for] = enabled_for.map(&:to_wire) unless enabled_for.empty?
+
+      disabled_for = feature.disabled_for.compact
+      hash[:disabled_for] = disabled_for.map(&:to_wire) unless disabled_for.empty?
       hash[:metadata] = feature.metadata unless feature.metadata.nil?
 
       hash
