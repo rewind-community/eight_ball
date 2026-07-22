@@ -88,6 +88,18 @@ RSpec.describe EightBall::Marshallers::Json do
       expect(result).not_to include 'flag_name'
     end
 
+    it 'should serialize coerce on a list condition only when enabled' do
+      coerced = [
+        EightBall::Feature.new('Coerced', [EightBall::Conditions::List.new(values: [1], parameter: 'param1', coerce: true)])
+      ]
+      expect(marshaller.marshall(coerced)).to include '"coerce":true'
+
+      default = [
+        EightBall::Feature.new('Default', [EightBall::Conditions::List.new(values: [1], parameter: 'param1')])
+      ]
+      expect(marshaller.marshall(default)).not_to include 'coerce'
+    end
+
     it 'should round-trip every condition type through the allowlist unchanged' do
       features = [
         EightBall::Feature.new('AlwaysFlag', [EightBall::Conditions::Always.new]),
@@ -150,6 +162,20 @@ RSpec.describe EightBall::Marshallers::Json do
       expect(features[1].enabled_for[0].values).to contain_exactly 1, 2, 3, 4
       expect(features[1].disabled_for.size).to be 1
       expect(features[1].disabled_for[0]).to be_a EightBall::Conditions::Never
+    end
+
+    it 'should round-trip a coerce-enabled list condition' do
+      json = %([{ "name": "Coerced", "enabledFor": [{ "type": "list", "parameter": "param1", "values": [1], "coerce": true }] }])
+
+      features = marshaller.unmarshall(json)
+      condition = features[0].enabled_for[0]
+
+      expect(condition).to be_a EightBall::Conditions::List
+      expect(condition.coerce).to be true
+      expect(condition.satisfied?('1')).to be true
+
+      # Re-marshalling preserves the coerce flag.
+      expect(marshaller.marshall(features)).to include '"coerce":true'
     end
 
     it 'should default to [] if JSON parsing error occurs' do

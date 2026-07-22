@@ -32,6 +32,22 @@ RSpec.describe EightBall::Conditions::List do
       list2 = EightBall::Conditions::List.new values: %w[John Jim]
       expect(list2.satisfied?('Jeremy')).to eq false
     end
+
+    it 'should not coerce types by default' do
+      expect(EightBall::Conditions::List.new(values: [1]).satisfied?('1')).to eq false
+      expect(EightBall::Conditions::List.new(values: ['1']).satisfied?(1)).to eq false
+    end
+
+    context 'when coerce is enabled' do
+      it 'should match across types by comparing both sides as strings' do
+        expect(EightBall::Conditions::List.new(values: [1], coerce: true).satisfied?('1')).to eq true
+        expect(EightBall::Conditions::List.new(values: ['1'], coerce: true).satisfied?(1)).to eq true
+      end
+
+      it 'should still return false for a non-member' do
+        expect(EightBall::Conditions::List.new(values: [1, 2], coerce: true).satisfied?('3')).to eq false
+      end
+    end
   end
 
   describe '==' do
@@ -59,6 +75,13 @@ RSpec.describe EightBall::Conditions::List do
     it 'should return false for Lists with different paramter names' do
       c1 = EightBall::Conditions::List.new parameter: 'id', values: [1, 2, 3]
       c2 = EightBall::Conditions::Base.new parameter: 'id2', values: [1, 2, 3]
+
+      expect(c1 == c2).to be false
+    end
+
+    it 'should return false for Lists that differ only in coerce' do
+      c1 = EightBall::Conditions::List.new parameter: 'id', values: [1, 2, 3]
+      c2 = EightBall::Conditions::List.new parameter: 'id', values: [1, 2, 3], coerce: true
 
       expect(c1 == c2).to be false
     end
