@@ -83,6 +83,10 @@ A Condition must either be `true` or `false`. It describes when a Feature is ena
 - [Range](lib/eight_ball/conditions/range.rb): This condition is satisfied if the given value is within the specified range (inclusive).
 - [Percentage](lib/eight_ball/conditions/percentage.rb): This condition is satisfied for a deterministic, sticky subset of subjects sized to `percentage` percent. Bucketing is salted by the flag name so a subject is decorrelated across flags. Wire form: `{"type":"percentage","parameter":"account_id","percentage":<0..100>}`.
 
+#### List value coercion
+
+By default a `list` matches by exact type, so an integer value never matches a string (and vice versa). Set `coerce: true` on a list to compare both sides as strings, so an integer-authored list matches a string caller. The default stays exact, and the field is serialized only when enabled. Wire form: `{"type":"list","parameter":"account_id","values":[2,3],"coerce":true}`.
+
 #### Sticky percentage bucketing
 
 The `percentage` condition buckets a subject deterministically:
