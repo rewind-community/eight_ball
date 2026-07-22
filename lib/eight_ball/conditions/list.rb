@@ -23,7 +23,8 @@ module EightBall::Conditions
       options ||= {}
 
       @values = Array(options[:values])
-      @coerce = options[:coerce] || nil
+      # Store a canonical true/nil so the wire never carries a stray non-boolean.
+      @coerce = options[:coerce] ? true : nil
       self.parameter = options[:parameter]
     end
 
@@ -33,7 +34,10 @@ module EightBall::Conditions
     #   condition.satisfied? 2 => false
     #   condition.satisfied? 'a' => true
     def satisfied?(value)
-      return values.map(&:to_s).include?(value.to_s) if @coerce
+      if @coerce
+        string_value = value.to_s
+        return values.any? { |v| v.to_s == string_value }
+      end
 
       values.include? value
     end
@@ -45,7 +49,9 @@ module EightBall::Conditions
     protected
 
     def state
-      super + [@values.sort, @coerce]
+      # sort_by(&:to_s) so a mixed-type list (eg. the int/string values coerce
+      # is built for) does not raise ArgumentError in ==/hash.
+      super + [@values.sort_by(&:to_s), @coerce]
     end
   end
 end

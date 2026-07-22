@@ -47,6 +47,17 @@ RSpec.describe EightBall::Conditions::List do
       it 'should still return false for a non-member' do
         expect(EightBall::Conditions::List.new(values: [1, 2], coerce: true).satisfied?('3')).to eq false
       end
+
+      it 'should normalize a truthy value to a canonical boolean so the wire carries no stray value' do
+        expect(EightBall::Conditions::List.new(values: [1], coerce: 1).coerce).to be true
+        expect(EightBall::Conditions::List.new(values: [1], coerce: false).coerce).to be_nil
+      end
+
+      it 'should compare mixed-type coerced Lists without raising' do
+        c1 = EightBall::Conditions::List.new(parameter: 'id', values: [1, '2'], coerce: true)
+        c2 = EightBall::Conditions::List.new(parameter: 'id', values: ['2', 1], coerce: true)
+        expect(c1 == c2).to be true
+      end
     end
   end
 
