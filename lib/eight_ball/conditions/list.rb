@@ -43,7 +43,9 @@ module EightBall::Conditions
     end
 
     def wire_fields
-      %i[values parameter coerce]
+      # coerce before parameter so the wire key order matches the eight-ball-ts
+      # port (whose parameter is always emitted last), keeping the two byte-identical.
+      %i[values coerce parameter]
     end
 
     protected

@@ -98,6 +98,19 @@ RSpec.describe EightBall::Marshallers::Json do
         EightBall::Feature.new('Default', [EightBall::Conditions::List.new(values: [1], parameter: 'param1')])
       ]
       expect(marshaller.marshall(default)).not_to include 'coerce'
+
+      # A truthy non-boolean serializes as a canonical true, never the raw value.
+      truthy = [
+        EightBall::Feature.new('Truthy', [EightBall::Conditions::List.new(values: [1], parameter: 'param1', coerce: 1)])
+      ]
+      expect(marshaller.marshall(truthy)).to include '"coerce":true'
+      expect(marshaller.marshall(truthy)).not_to include '"coerce":1'
+
+      # An explicit false is omitted from the wire, same as the default.
+      explicit_false = [
+        EightBall::Feature.new('ExplicitFalse', [EightBall::Conditions::List.new(values: [1], parameter: 'param1', coerce: false)])
+      ]
+      expect(marshaller.marshall(explicit_false)).not_to include 'coerce'
     end
 
     it 'should round-trip every condition type through the allowlist unchanged' do

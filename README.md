@@ -87,6 +87,8 @@ A Condition must either be `true` or `false`. It describes when a Feature is ena
 
 By default a `list` matches by exact type, so an integer value never matches a string (and vice versa). Set `coerce: true` on a list to compare both sides as strings, so an integer-authored list matches a string caller. The default stays exact, and the field is serialized only when enabled. Wire form: `{"type":"list","parameter":"account_id","values":[2,3],"coerce":true}`.
 
+Coercion is exact string comparison (`value.to_s`), not numeric or fuzzy: `1.0` does not match a `[1]` list, and `nil`/`""` share a string form. It is intended for scalar id/name lists. Cross-version note: a reader on a pre-`coerce` gem ignores the field and matches exactly, so a `coerce:true` flag can evaluate differently across gem versions until every reader is upgraded.
+
 #### Sticky percentage bucketing
 
 The `percentage` condition buckets a subject deterministically:

@@ -48,7 +48,13 @@ RSpec.describe EightBall::Conditions::List do
         expect(EightBall::Conditions::List.new(values: [1, 2], coerce: true).satisfied?('3')).to eq false
       end
 
-      it 'should normalize a truthy value to a canonical boolean so the wire carries no stray value' do
+      it 'compares by exact string form: 1.0 does not match 1, and nil/empty share a form' do
+        expect(EightBall::Conditions::List.new(values: [1], coerce: true).satisfied?(1.0)).to eq false
+        expect(EightBall::Conditions::List.new(values: [1], coerce: true).satisfied?(nil)).to eq false
+        expect(EightBall::Conditions::List.new(values: [nil], coerce: true).satisfied?('')).to eq true
+      end
+
+      it 'should normalize a truthy value to a canonical boolean' do
         expect(EightBall::Conditions::List.new(values: [1], coerce: 1).coerce).to be true
         expect(EightBall::Conditions::List.new(values: [1], coerce: false).coerce).to be_nil
       end
