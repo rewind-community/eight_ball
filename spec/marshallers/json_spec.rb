@@ -92,7 +92,9 @@ RSpec.describe EightBall::Marshallers::Json do
       coerced = [
         EightBall::Feature.new('Coerced', [EightBall::Conditions::List.new(values: [1], parameter: 'param1', coerce: true)])
       ]
-      expect(marshaller.marshall(coerced)).to include '"coerce":true'
+      # Exact substring, so the key order (coerce before parameter) that keeps the
+      # wire byte-identical with eight-ball-ts cannot silently regress.
+      expect(marshaller.marshall(coerced)).to include '"values":[1],"coerce":true,"parameter":"param1"'
 
       default = [
         EightBall::Feature.new('Default', [EightBall::Conditions::List.new(values: [1], parameter: 'param1')])

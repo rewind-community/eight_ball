@@ -34,6 +34,8 @@ RSpec.describe EightBall::Conditions::List do
     end
 
     it 'should not coerce types by default' do
+      # The exact-type match still succeeds, so a regression in the non-coerce path is caught.
+      expect(EightBall::Conditions::List.new(values: [1]).satisfied?(1)).to eq true
       expect(EightBall::Conditions::List.new(values: [1]).satisfied?('1')).to eq false
       expect(EightBall::Conditions::List.new(values: ['1']).satisfied?(1)).to eq false
     end

@@ -29,7 +29,7 @@ module EightBall::Conditions
     end
 
     # @example
-    #   condition = new EightBall::Conditions::List.new [1, 'a']
+    #   condition = EightBall::Conditions::List.new(values: [1, 'a'])
     #   condition.satisfied? 1 => true
     #   condition.satisfied? 2 => false
     #   condition.satisfied? 'a' => true
