@@ -1,5 +1,9 @@
 # Changelog
 
+## [3.4.0]
+
+- Add an opt-in `coerce` boolean to the `list` condition. When `true`, values and the tested input are compared as strings, so a list authored with integers matches a string caller (and vice versa). Defaults to exact-type matching, so existing definitions are unchanged; the flag is serialized only when enabled.
+
 ## [3.3.3]
 
 - Add `.compact` before each `.map(&:to_wire)` so stray nil conditions are
