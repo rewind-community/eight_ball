@@ -3,10 +3,8 @@
 require 'digest'
 
 RSpec.describe EightBall::Conditions::Percentage do
-  def build(percentage:, flag_name: 'Flag', parameter: nil)
-    opts = { percentage: percentage }
-    opts[:parameter] = parameter if parameter
-    condition = EightBall::Conditions::Percentage.new opts
+  def build(percentage:, flag_name: 'Flag', parameter: 'account_id')
+    condition = EightBall::Conditions::Percentage.new percentage: percentage, parameter: parameter
     condition.flag_name = flag_name
     condition
   end
@@ -18,16 +16,21 @@ RSpec.describe EightBall::Conditions::Percentage do
     end
 
     it 'should raise if percentage is out of range' do
-      expect { EightBall::Conditions::Percentage.new(percentage: -1) }
+      expect { EightBall::Conditions::Percentage.new(percentage: -1, parameter: 'account_id') }
         .to raise_error ArgumentError, 'percentage must be an integer between 0 and 100'
-      expect { EightBall::Conditions::Percentage.new(percentage: 101) }
+      expect { EightBall::Conditions::Percentage.new(percentage: 101, parameter: 'account_id') }
         .to raise_error ArgumentError, 'percentage must be an integer between 0 and 100'
-      expect { EightBall::Conditions::Percentage.new(percentage: 'fifty') }
+      expect { EightBall::Conditions::Percentage.new(percentage: 'fifty', parameter: 'account_id') }
         .to raise_error ArgumentError, 'percentage must be an integer between 0 and 100'
     end
 
-    it 'should leave parameter nil when not provided' do
-      expect(EightBall::Conditions::Percentage.new(percentage: 50).parameter).to be_nil
+    it 'should raise if parameter is missing' do
+      expect { EightBall::Conditions::Percentage.new(percentage: 50) }
+        .to raise_error ArgumentError, 'Missing value for parameter'
+      expect { EightBall::Conditions::Percentage.new(percentage: 50, parameter: nil) }
+        .to raise_error ArgumentError, 'Missing value for parameter'
+      expect { EightBall::Conditions::Percentage.new(percentage: 50, parameter: '  ') }
+        .to raise_error ArgumentError, 'Missing value for parameter'
     end
 
     it 'should accept an explicit parameter (snake-cased by Base)' do
@@ -35,22 +38,22 @@ RSpec.describe EightBall::Conditions::Percentage do
     end
 
     it 'should expose the percentage' do
-      expect(EightBall::Conditions::Percentage.new(percentage: 25).percentage).to eq 25
+      expect(EightBall::Conditions::Percentage.new(percentage: 25, parameter: 'account_id').percentage).to eq 25
     end
 
     it 'should accept an integral Float percentage' do
-      expect(EightBall::Conditions::Percentage.new(percentage: 50.0).percentage).to eq 50
+      expect(EightBall::Conditions::Percentage.new(percentage: 50.0, parameter: 'account_id').percentage).to eq 50
     end
 
     it 'should reject a non-integral Float percentage' do
-      expect { EightBall::Conditions::Percentage.new(percentage: 50.5) }
+      expect { EightBall::Conditions::Percentage.new(percentage: 50.5, parameter: 'account_id') }
         .to raise_error ArgumentError, 'percentage must be an integer between 0 and 100'
     end
   end
 
   describe 'satisfied?' do
     it 'should raise if flag_name was never injected' do
-      condition = EightBall::Conditions::Percentage.new percentage: 50
+      condition = EightBall::Conditions::Percentage.new percentage: 50, parameter: 'account_id'
       expect { condition.satisfied?('123') }
         .to raise_error ArgumentError, 'flag_name has not been set on Percentage condition'
     end
@@ -128,8 +131,8 @@ RSpec.describe EightBall::Conditions::Percentage do
     end
 
     it 'should differ when percentage differs' do
-      c1 = EightBall::Conditions::Percentage.new percentage: 30
-      c2 = EightBall::Conditions::Percentage.new percentage: 40
+      c1 = EightBall::Conditions::Percentage.new percentage: 30, parameter: 'account_id'
+      c2 = EightBall::Conditions::Percentage.new percentage: 40, parameter: 'account_id'
       expect(c1 == c2).to be false
     end
 

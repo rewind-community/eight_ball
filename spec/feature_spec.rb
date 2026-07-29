@@ -31,6 +31,42 @@ RSpec.describe EightBall::Feature do
       expect(feature.enabled?).to be false
     end
 
+    it 'should not let an unsatisfied parameterless condition decide the direction' do
+      unsatisfied = EightBall::Conditions::Never.new
+      satisfied = EightBall::Conditions::List.new values: ['123'], parameter: 'account_id'
+
+      feature = EightBall::Feature.new 'Feature', [unsatisfied, satisfied]
+      expect(feature.enabled?(account_id: '123')).to be true
+    end
+
+    it 'should evaluate enabled_for the same regardless of condition order' do
+      never = EightBall::Conditions::Never.new
+      list = EightBall::Conditions::List.new values: ['123'], parameter: 'account_id'
+
+      before = EightBall::Feature.new('Feature', [never, list]).enabled?(account_id: '123')
+      after = EightBall::Feature.new('Feature', [list, never]).enabled?(account_id: '123')
+      expect(before).to be true
+      expect(after).to be true
+      expect(before).to eq after
+    end
+
+    it 'should still require the parameter of a condition that follows a parameterless one' do
+      # Treating an absent parameter as unsatisfied would let a disabled_for entry stop disabling.
+      never = EightBall::Conditions::Never.new
+      list = EightBall::Conditions::List.new values: ['123'], parameter: 'account_id'
+
+      feature = EightBall::Feature.new 'Feature', [never, list]
+      expect { feature.enabled? }.to raise_error ArgumentError, 'Missing parameter account_id'
+    end
+
+    it 'should still apply a disabled_for condition that follows a parameterless one' do
+      never = EightBall::Conditions::Never.new
+      list = EightBall::Conditions::List.new values: ['123'], parameter: 'account_id'
+
+      feature = EightBall::Feature.new 'Feature', [EightBall::Conditions::Always.new], [never, list]
+      expect(feature.enabled?(account_id: '123')).to be false
+    end
+
     it 'should return true if enabled_for satisfied and disabled_for not satisfied' do
       satisfied = EightBall::Conditions::Always.new
       unsatisfied = EightBall::Conditions::Never.new
@@ -200,6 +236,36 @@ RSpec.describe EightBall::Feature do
 
       # Normally this raises ArgumentError (missing param1); un-evaluable must short-circuit first.
       expect(feature.enabled?).to be false
+    end
+
+    it 'should be derived from the conditions, so a rebuilt Feature stays closed' do
+      parsed = EightBall::Marshallers::Json.new.unmarshall(
+        '[{"name":"F","enabledFor":[{"type":"always"},{"type":"percentage","percentage":50}]}]'
+      ).first
+      expect(parsed.un_evaluable?).to be true
+
+      # un_evaluable! is not carried over, so this has to follow from the Opaque itself.
+      rebuilt = EightBall::Feature.new parsed.name, parsed.enabled_for, parsed.disabled_for
+      expect(rebuilt.un_evaluable?).to be true
+      expect(rebuilt.enabled?(organization_id: 'org-1')).to be false
+    end
+  end
+
+  describe 'nil conditions' do
+    it 'should ignore nil entries rather than raise while evaluating' do
+      never = EightBall::Conditions::Never.new
+      list = EightBall::Conditions::List.new values: ['123'], parameter: 'account_id'
+
+      expect(EightBall::Feature.new('F', [never, nil]).enabled?(account_id: '123')).to be false
+      expect(EightBall::Feature.new('F', [nil, list]).enabled?(account_id: '123')).to be true
+      expect(EightBall::Feature.new('F', [EightBall::Conditions::Always.new], [nil, list])
+        .enabled?(account_id: '123')).to be false
+    end
+
+    it 'should drop nil entries from the condition lists' do
+      feature = EightBall::Feature.new 'F', [nil, EightBall::Conditions::Always.new, nil], [nil]
+      expect(feature.enabled_for.size).to eq 1
+      expect(feature.disabled_for).to be_empty
     end
   end
 

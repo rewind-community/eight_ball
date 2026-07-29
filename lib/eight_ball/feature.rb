@@ -20,10 +20,12 @@ module EightBall
     #   feature = EightBall::Feature.new 'feature1', EightBall::Conditions::Always
     def initialize(name, enabled_for = [], disabled_for = [], metadata: nil)
       @name = name
-      @enabled_for = inject_flag_name(Array(enabled_for))
-      @disabled_for = inject_flag_name(Array(disabled_for))
+      # A nil entry has no #parameter and would raise while evaluating.
+      @enabled_for = inject_flag_name(Array(enabled_for).compact)
+      @disabled_for = inject_flag_name(Array(disabled_for).compact)
       @metadata = metadata
-      @un_evaluable = false
+      # Derived, so a Feature rebuilt from these conditions stays un-evaluable.
+      @un_evaluable = (@enabled_for + @disabled_for).any? { |c| c.is_a?(EightBall::Conditions::Opaque) }
     end
 
     # "EightBall, is this Feature enabled?"
@@ -82,7 +84,8 @@ module EightBall
 
     def any_satisfied?(conditions, parameters)
       conditions.any? do |condition|
-        return condition.satisfied? if condition.parameter.nil?
+        # next, not return: a return exits the method and decides the whole direction.
+        next condition.satisfied? if condition.parameter.nil?
 
         value = parameters[condition.parameter.to_sym]
         raise ArgumentError, "Missing parameter #{condition.parameter}" if value.nil?

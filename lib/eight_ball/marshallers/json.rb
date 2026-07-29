@@ -130,10 +130,17 @@ module EightBall::Marshallers
 
       condition_class = EightBall::Conditions.by_name condition[:type]
       return EightBall::Conditions::Opaque.new(condition) if condition_class.nil?
+      # Nothing to match against without a parameter, so fail the flag closed.
+      return EightBall::Conditions::Opaque.new(condition) if requires_parameter?(condition_class) && condition[:parameter].to_s.strip.empty?
 
       condition_class.new condition
     rescue StandardError
       EightBall::Conditions::Opaque.new(condition)
+    end
+
+    # A condition that evaluates against a subject value is one that needs a parameter.
+    def requires_parameter?(condition_class)
+      condition_class.instance_method(:satisfied?).arity.positive?
     end
   end
 end
