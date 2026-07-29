@@ -45,7 +45,21 @@ RSpec.describe EightBall::Feature do
 
       before = EightBall::Feature.new('Feature', [never, list]).enabled?(account_id: '123')
       after = EightBall::Feature.new('Feature', [list, never]).enabled?(account_id: '123')
+      expect(before).to be true
+      expect(after).to be true
       expect(before).to eq after
+    end
+
+    it 'should still require the parameter of a condition that follows a parameterless one' do
+      # Deliberate: a parameterless condition no longer suppresses the rest of the
+      # direction, so a later condition's parameter is required exactly as it
+      # would be if that condition stood alone. Treating it as unsatisfied
+      # instead would let a disabled_for entry silently stop disabling.
+      never = EightBall::Conditions::Never.new
+      list = EightBall::Conditions::List.new values: ['123'], parameter: 'account_id'
+
+      feature = EightBall::Feature.new 'Feature', [never, list]
+      expect { feature.enabled? }.to raise_error ArgumentError, 'Missing parameter account_id'
     end
 
     it 'should still apply a disabled_for condition that follows a parameterless one' do
