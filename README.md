@@ -55,8 +55,8 @@ features = marshaller.unmarshall json_input
 EightBall.provider = EightBall::Providers::Static.new features
 
 # Away you go
-EightBall.enabled? "Feature1", { accountId: 4 } # true
-EightBall.enabled? "Feature1", { accountId: 2 } # false
+EightBall.enabled? "Feature1", { account_id: 4 } # true
+EightBall.enabled? "Feature1", { account_id: 2 } # false
 ```
 
 More examples [here](examples)
