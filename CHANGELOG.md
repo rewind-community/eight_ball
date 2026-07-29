@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.5.0]
+
+- Fix `Feature#enabled?` so a direction's conditions are evaluated as the documented OR. `any_satisfied?` used `return` inside an `any?` block, which exits the method, so the first condition without a parameter became the whole verdict and later conditions were never consulted. A `never` ahead of a matching `list` evaluated to false in `enabledFor`, and a `never` ahead of a matching entry in `disabledFor` stopped that entry from disabling the feature.
+
+  Behaviour is unchanged for any direction holding a single condition, or holding no parameterless condition. **Upgrade note for a direction that holds a parameterless condition alongside a parameterized one:** because evaluation no longer stops at the parameterless condition, the later condition's parameter is now required in the evaluation bag, exactly as it would be if that condition stood alone. Such a definition previously answered `false` when the parameter was absent and now raises `ArgumentError, "Missing parameter ..."`. Treating an absent parameter as unsatisfied instead was rejected deliberately: it would let a `disabledFor` entry silently stop disabling a feature when a caller omits the key. Check any definition with more than one condition in a direction before upgrading.
+
+- Reject a `percentage` condition with no `parameter`. It previously built successfully and then raised `wrong number of arguments` on every evaluation; it now fails the owning feature closed, like every other invalid percentage.
+
 ## [3.4.0]
 
 - Add an opt-in `coerce` boolean to the `list` condition. When `true`, values and the tested input are compared as strings, so a list authored with integers matches a string caller (and vice versa). Defaults to exact-type matching, so existing definitions are unchanged; the flag is serialized only when enabled.

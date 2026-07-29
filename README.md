@@ -81,7 +81,7 @@ A Condition must either be `true` or `false`. It describes when a Feature is ena
 - [List](lib/eight_ball/conditions/list.rb): This condition is satisfied if the given value belongs to its list of accepted values.
 - [Never](lib/eight_ball/conditions/never.rb): This condition is never satisfied.
 - [Range](lib/eight_ball/conditions/range.rb): This condition is satisfied if the given value is within the specified range (inclusive).
-- [Percentage](lib/eight_ball/conditions/percentage.rb): This condition is satisfied for a deterministic, sticky subset of subjects sized to `percentage` percent. Bucketing is salted by the flag name so a subject is decorrelated across flags. Wire form: `{"type":"percentage","parameter":"account_id","percentage":<0..100>}`.
+- [Percentage](lib/eight_ball/conditions/percentage.rb): This condition is satisfied for a deterministic, sticky subset of subjects sized to `percentage` percent. Bucketing is salted by the flag name so a subject is decorrelated across flags. `parameter` is required. Wire form: `{"type":"percentage","percentage":<0..100>,"parameter":"account_id"}`.
 
 #### List value coercion
 
