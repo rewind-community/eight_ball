@@ -316,6 +316,31 @@ RSpec.describe EightBall::Marshallers::Json do
       expect(bad.enabled?).to be false
     end
 
+    it 'should fail a percentage without a parameter closed rather than raise on evaluation' do
+      # A percentage needs a parameter to bucket on. Left out, it must fail the
+      # flag closed like any other unbuildable condition instead of reaching
+      # evaluation and raising there for every caller.
+      json = %(
+        [{
+          "name": "GoodFlag",
+          "enabledFor": [{ "type": "always" }]
+        }, {
+          "name": "NoParameter",
+          "enabledFor": [{ "type": "percentage", "percentage": 50 }]
+        }]
+      )
+
+      features = nil
+      expect { features = marshaller.unmarshall(json) }.not_to raise_error
+
+      expect(features.size).to be 2
+      expect(features.find { |f| f.name == 'GoodFlag' }.enabled?).to be true
+
+      bad = features.find { |f| f.name == 'NoParameter' }
+      expect(bad.un_evaluable?).to be true
+      expect { expect(bad.enabled?(organization_id: 'org-1')).to be false }.not_to raise_error
+    end
+
     it 'should preserve an un-evaluable flag verbatim across a marshall round-trip (no OFF->ON flip, no definition loss)' do
       json = %([{ "name": "BadFlag", "enabledFor": [{ "type": "made_up_type", "parameter": "accountId" }] }])
 
