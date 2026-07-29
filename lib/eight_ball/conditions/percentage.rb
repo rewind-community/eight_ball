@@ -13,16 +13,12 @@ module EightBall::Conditions
     # @param [Hash] options
     # @option options [Integer] :percentage Integer 0..100. 0 is never
     #   satisfied; 100 is always satisfied.
-    # @option options [String] :parameter Required. The name of the parameter this
-    #   Condition buckets on (eg. "account_id").
+    # @option options [String] :parameter Required. The parameter to bucket on (eg. "account_id").
     def initialize(options = {})
       options ||= {}
 
       raise ArgumentError, 'Missing value for percentage' if options[:percentage].nil?
-      # A percentage rolls out over a subject attribute, so it needs a parameter
-      # to bucket on. Without one every subject shares a salt and the condition
-      # answers the same for everybody, so reject it here and let the owning
-      # feature fail closed rather than raise on every evaluation.
+      # Without a parameter every subject shares one salt, so the flag ships to 0 or 100 percent.
       raise ArgumentError, 'Missing value for parameter' if options[:parameter].to_s.strip.empty?
 
       percentage = options[:percentage]

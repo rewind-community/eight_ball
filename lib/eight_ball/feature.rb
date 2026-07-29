@@ -20,14 +20,11 @@ module EightBall
     #   feature = EightBall::Feature.new 'feature1', EightBall::Conditions::Always
     def initialize(name, enabled_for = [], disabled_for = [], metadata: nil)
       @name = name
-      # compact: a nil entry has no #parameter and would raise NoMethodError during
-      # evaluation. The marshaller already drops nils on the way out.
+      # A nil entry has no #parameter and would raise while evaluating.
       @enabled_for = inject_flag_name(Array(enabled_for).compact)
       @disabled_for = inject_flag_name(Array(disabled_for).compact)
       @metadata = metadata
-      # Derived, not just a flag someone remembered to set: an Opaque condition is
-      # one the gem could not build, so a Feature carrying one is un-evaluable
-      # however it was constructed, including when rebuilt from another's conditions.
+      # Derived, so a Feature rebuilt from these conditions stays un-evaluable.
       @un_evaluable = (@enabled_for + @disabled_for).any? { |c| c.is_a?(EightBall::Conditions::Opaque) }
     end
 
@@ -87,9 +84,7 @@ module EightBall
 
     def any_satisfied?(conditions, parameters)
       conditions.any? do |condition|
-        # `next`, not `return`: a return here would exit any_satisfied? and make
-        # the first parameterless condition the whole verdict, so the direction
-        # would depend on condition order instead of being an OR.
+        # next, not return: a return exits the method and decides the whole direction.
         next condition.satisfied? if condition.parameter.nil?
 
         value = parameters[condition.parameter.to_sym]

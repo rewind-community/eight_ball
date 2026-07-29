@@ -51,10 +51,7 @@ RSpec.describe EightBall::Feature do
     end
 
     it 'should still require the parameter of a condition that follows a parameterless one' do
-      # Deliberate: a parameterless condition no longer suppresses the rest of the
-      # direction, so a later condition's parameter is required exactly as it
-      # would be if that condition stood alone. Treating it as unsatisfied
-      # instead would let a disabled_for entry silently stop disabling.
+      # Treating an absent parameter as unsatisfied would let a disabled_for entry stop disabling.
       never = EightBall::Conditions::Never.new
       list = EightBall::Conditions::List.new values: ['123'], parameter: 'account_id'
 
@@ -247,8 +244,7 @@ RSpec.describe EightBall::Feature do
       ).first
       expect(parsed.un_evaluable?).to be true
 
-      # Rebuilding from another Feature's conditions must not resurrect the flag:
-      # un_evaluable! is not carried over, so it has to follow from the Opaque itself.
+      # un_evaluable! is not carried over, so this has to follow from the Opaque itself.
       rebuilt = EightBall::Feature.new parsed.name, parsed.enabled_for, parsed.disabled_for
       expect(rebuilt.un_evaluable?).to be true
       expect(rebuilt.enabled?(organization_id: 'org-1')).to be false

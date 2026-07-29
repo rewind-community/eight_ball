@@ -317,9 +317,7 @@ RSpec.describe EightBall::Marshallers::Json do
     end
 
     it 'should fail a percentage without a parameter closed rather than raise on evaluation' do
-      # A percentage needs a parameter to bucket on. Left out, it must fail the
-      # flag closed like any other unbuildable condition instead of reaching
-      # evaluation and raising there for every caller.
+      # Must fail the flag closed rather than reach evaluation and raise for every caller.
       json = %(
         [{
           "name": "GoodFlag",
@@ -342,9 +340,7 @@ RSpec.describe EightBall::Marshallers::Json do
     end
 
     it 'should fail closed for ANY parameterized condition with no parameter' do
-      # list, range and percentage all evaluate against a subject value, so
-      # without a parameter each would raise for every caller. always and never
-      # take no value and must keep working with no parameter.
+      # always and never take no value, so they must keep working with no parameter.
       json = %(
         [{ "name": "NoParamList", "enabledFor": [{ "type": "list", "values": ["1"] }] },
          { "name": "NoParamRange", "enabledFor": [{ "type": "range", "min": 1, "max": 9 }] },
