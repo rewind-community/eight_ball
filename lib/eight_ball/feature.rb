@@ -20,10 +20,15 @@ module EightBall
     #   feature = EightBall::Feature.new 'feature1', EightBall::Conditions::Always
     def initialize(name, enabled_for = [], disabled_for = [], metadata: nil)
       @name = name
-      @enabled_for = inject_flag_name(Array(enabled_for))
-      @disabled_for = inject_flag_name(Array(disabled_for))
+      # compact: a nil entry has no #parameter and would raise NoMethodError during
+      # evaluation. The marshaller already drops nils on the way out.
+      @enabled_for = inject_flag_name(Array(enabled_for).compact)
+      @disabled_for = inject_flag_name(Array(disabled_for).compact)
       @metadata = metadata
-      @un_evaluable = false
+      # Derived, not just a flag someone remembered to set: an Opaque condition is
+      # one the gem could not build, so a Feature carrying one is un-evaluable
+      # however it was constructed, including when rebuilt from another's conditions.
+      @un_evaluable = (@enabled_for + @disabled_for).any? { |c| c.is_a?(EightBall::Conditions::Opaque) }
     end
 
     # "EightBall, is this Feature enabled?"
