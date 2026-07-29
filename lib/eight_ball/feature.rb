@@ -82,7 +82,10 @@ module EightBall
 
     def any_satisfied?(conditions, parameters)
       conditions.any? do |condition|
-        return condition.satisfied? if condition.parameter.nil?
+        # `next`, not `return`: a return here would exit any_satisfied? and make
+        # the first parameterless condition the whole verdict, so the direction
+        # would depend on condition order instead of being an OR.
+        next condition.satisfied? if condition.parameter.nil?
 
         value = parameters[condition.parameter.to_sym]
         raise ArgumentError, "Missing parameter #{condition.parameter}" if value.nil?

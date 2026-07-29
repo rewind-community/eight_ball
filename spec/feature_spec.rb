@@ -31,6 +31,31 @@ RSpec.describe EightBall::Feature do
       expect(feature.enabled?).to be false
     end
 
+    it 'should not let an unsatisfied parameterless condition decide the direction' do
+      unsatisfied = EightBall::Conditions::Never.new
+      satisfied = EightBall::Conditions::List.new values: ['123'], parameter: 'account_id'
+
+      feature = EightBall::Feature.new 'Feature', [unsatisfied, satisfied]
+      expect(feature.enabled?(account_id: '123')).to be true
+    end
+
+    it 'should evaluate enabled_for the same regardless of condition order' do
+      never = EightBall::Conditions::Never.new
+      list = EightBall::Conditions::List.new values: ['123'], parameter: 'account_id'
+
+      before = EightBall::Feature.new('Feature', [never, list]).enabled?(account_id: '123')
+      after = EightBall::Feature.new('Feature', [list, never]).enabled?(account_id: '123')
+      expect(before).to eq after
+    end
+
+    it 'should still apply a disabled_for condition that follows a parameterless one' do
+      never = EightBall::Conditions::Never.new
+      list = EightBall::Conditions::List.new values: ['123'], parameter: 'account_id'
+
+      feature = EightBall::Feature.new 'Feature', [EightBall::Conditions::Always.new], [never, list]
+      expect(feature.enabled?(account_id: '123')).to be false
+    end
+
     it 'should return true if enabled_for satisfied and disabled_for not satisfied' do
       satisfied = EightBall::Conditions::Always.new
       unsatisfied = EightBall::Conditions::Never.new
