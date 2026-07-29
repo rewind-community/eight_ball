@@ -341,6 +341,30 @@ RSpec.describe EightBall::Marshallers::Json do
       expect { expect(bad.enabled?(organization_id: 'org-1')).to be false }.not_to raise_error
     end
 
+    it 'should fail closed for ANY parameterized condition with no parameter' do
+      # list, range and percentage all evaluate against a subject value, so
+      # without a parameter each would raise for every caller. always and never
+      # take no value and must keep working with no parameter.
+      json = %(
+        [{ "name": "NoParamList", "enabledFor": [{ "type": "list", "values": ["1"] }] },
+         { "name": "NoParamRange", "enabledFor": [{ "type": "range", "min": 1, "max": 9 }] },
+         { "name": "BlankParam", "enabledFor": [{ "type": "list", "values": ["1"], "parameter": "  " }] },
+         { "name": "Parameterless", "enabledFor": [{ "type": "always" }] }]
+      )
+
+      features = nil
+      expect { features = marshaller.unmarshall(json) }.not_to raise_error
+      by_name = features.to_h { |f| [f.name, f] }
+
+      %w[NoParamList NoParamRange BlankParam].each do |name|
+        expect(by_name[name].un_evaluable?).to be(true), "#{name} should be un-evaluable"
+        expect { expect(by_name[name].enabled?(account_id: '1')).to be false }.not_to raise_error
+      end
+
+      expect(by_name['Parameterless'].un_evaluable?).to be false
+      expect(by_name['Parameterless'].enabled?).to be true
+    end
+
     it 'should preserve an un-evaluable flag verbatim across a marshall round-trip (no OFF->ON flip, no definition loss)' do
       json = %([{ "name": "BadFlag", "enabledFor": [{ "type": "made_up_type", "parameter": "accountId" }] }])
 

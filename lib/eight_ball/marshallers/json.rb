@@ -130,10 +130,20 @@ module EightBall::Marshallers
 
       condition_class = EightBall::Conditions.by_name condition[:type]
       return EightBall::Conditions::Opaque.new(condition) if condition_class.nil?
+      # A condition whose satisfied? takes a value has nothing to bucket or match
+      # on without a parameter, and would raise for every caller on every
+      # evaluation. Unbuildable, so the flag fails closed like any other bad entry.
+      return EightBall::Conditions::Opaque.new(condition) if requires_parameter?(condition_class) && condition[:parameter].to_s.strip.empty?
 
       condition_class.new condition
     rescue StandardError
       EightBall::Conditions::Opaque.new(condition)
+    end
+
+    # True for a condition type that evaluates against a subject value, which is
+    # exactly the set that needs a parameter naming where that value comes from.
+    def requires_parameter?(condition_class)
+      condition_class.instance_method(:satisfied?).arity.positive?
     end
   end
 end
