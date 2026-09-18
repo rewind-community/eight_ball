@@ -74,9 +74,14 @@ jobs:
           VERSION=${{steps.get_version.outputs.version}}; awk "/## \[$VERSION\]/{flag=1;next}/## \[/{flag=0}flag" CHANGELOG.md > REL-BODY.md
 
       - name: Create Release
-        uses: ncipollo/release-action@339a81892b84b4eeb0f6e744e4574d79d0d9b8dd # v1.13.0
+        uses: ncipollo/release-action@339a81892b84b4eeb0f6e744e4574d79d0d9b8dd # v1.21.0
         with:
           tag: ${{steps.get_version.outputs.version_tag}}
           artifacts: "*.gem, CHANGELOG.md"
           bodyFile: "REL-BODY.md"
           token: ${{ steps.app-token.outputs.token }}
+          # An immutable release seals on publish, so assets have to land while
+          # it is still a draft. This creates a draft, uploads, then publishes.
+          immutableCreate: true
+          # Upload failures were warnings, so v3.3.2 onward published empty and green.
+          artifactErrorsFailBuild: true
